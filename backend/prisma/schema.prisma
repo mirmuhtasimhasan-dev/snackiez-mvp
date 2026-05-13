@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+model Category {
+  id        String     @id @default(uuid())
+  name      String
+  menuItems MenuItem[]
+  createdAt DateTime   @default(now())
+}
+
+model MenuItem {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  image       String?
+  isAvailable Boolean     @default(true)
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  address   String?
+  orders    Order[]
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  orderCode   String      @unique
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  items       OrderItem[]
+  totalAmount Float
+  status      OrderStatus @default(PENDING)
+  payment     Payment?
+  createdAt   DateTime    @default(now())
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  menuItemId String
+  quantity   Int
+  price      Float
+
+  order      Order    @relation(fields: [orderId], references: [id])
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  orderId   String        @unique
+  order     Order         @relation(fields: [orderId], references: [id])
+  method    PaymentMethod
+  status    PaymentStatus @default(UNPAID)
+  amount    Float
+  createdAt DateTime      @default(now())
+}
+
+model Banner {
+  id        String   @id @default(uuid())
+  title     String
+  image     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BKASH
+  NAGAD
+  CARD
+}
+
+enum PaymentStatus {
+  PAID
+  UNPAID
+  FAILED
+}
