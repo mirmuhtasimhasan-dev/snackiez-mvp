@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import api from "@/services/api";
+import { trackOrder } from "@/app/actions/orders";
 
 export default function ReceiptPage() {
   const [orderCode, setOrderCode] = useState("");
@@ -13,9 +13,9 @@ export default function ReceiptPage() {
     try {
       setLoading(true);
 
-      const response = await api.get(`/orders/track/${code}`);
+      const result = await trackOrder(code);
 
-      setOrder(response.data.order);
+      setOrder(result.success ? result.data : null);
     } catch (error) {
       console.log("Receipt fetch error:", error);
       setOrder(null);
@@ -59,10 +59,10 @@ export default function ReceiptPage() {
           </p>
 
           <Link
-            href="/track"
+            href="/menu"
             className="inline-block mt-6 bg-orange-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-orange-600"
           >
-            Track Order
+            Back to Menu
           </Link>
         </div>
       </main>
@@ -73,7 +73,7 @@ export default function ReceiptPage() {
     <main className="min-h-screen bg-gray-100 px-6 py-10">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-md p-8">
         <div className="text-center border-b pb-6">
-          <h1 className="text-4xl font-bold text-orange-500">Snackiez</h1>
+          <h1 className="text-4xl font-bold text-orange-500">Bitezz</h1>
 
           <p className="text-gray-600 mt-2">
             Fast, Fresh & Budget-Friendly Bites
@@ -152,7 +152,18 @@ export default function ReceiptPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-8 pt-5 border-t">
+        <div className="mt-8 pt-5 border-t space-y-2 text-gray-700">
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span>৳ {Number(order.totalAmount) - Number(order.deliveryFee)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Delivery fee</span>
+            <span>৳ {order.deliveryFee}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mt-4 pt-4 border-t">
           <h3 className="text-2xl font-bold text-gray-900">Total Amount</h3>
 
           <p className="text-3xl font-bold text-orange-500">
@@ -162,13 +173,6 @@ export default function ReceiptPage() {
 
         <div className="mt-8 flex flex-col md:flex-row gap-4">
           <Link
-            href={`/track?code=${order.orderCode}`}
-            className="w-full text-center bg-orange-500 text-white py-3 rounded-xl font-bold hover:bg-orange-600"
-          >
-            Track This Order
-          </Link>
-
-          <Link
             href="/menu"
             className="w-full text-center border border-orange-500 text-orange-500 py-3 rounded-xl font-bold hover:bg-orange-50"
           >
@@ -177,7 +181,7 @@ export default function ReceiptPage() {
         </div>
 
         <p className="text-center text-gray-500 text-sm mt-8">
-          Thank you for ordering from Snackiez.
+          Thank you for ordering from Bitezz.
         </p>
       </div>
     </main>

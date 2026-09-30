@@ -1,80 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import logo from "@/public/logo.png";
+import { useCart } from "./CartProvider";
+import { BagIcon } from "./icons";
 
 export default function Navbar() {
-  const pathname = usePathname();
-  const [cartCount, setCartCount] = useState(0);
-
-  const updateCartCount = () => {
-    const savedCart = JSON.parse(localStorage.getItem("snackiez_cart")) || [];
-
-    const totalItems = savedCart.reduce(
-      (total, item) => total + item.quantity,
-      0
-    );
-
-    setCartCount(totalItems);
-  };
-
-  useEffect(() => {
-    updateCartCount();
-
-    window.addEventListener("cartUpdated", updateCartCount);
-    window.addEventListener("storage", updateCartCount);
-
-    return () => {
-      window.removeEventListener("cartUpdated", updateCartCount);
-      window.removeEventListener("storage", updateCartCount);
-    };
-  }, [pathname]);
+  const { count, openCart } = useCart();
 
   return (
-    <nav className="sticky top-0 z-50 bg-white shadow-md">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <Link href="/" className="text-3xl font-bold text-orange-500">
-          Snackiez
+    <header className="sticky top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-md">
+      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+        <Link href="/" className="flex items-center gap-2" aria-label="Bitezz home">
+          <Image src={logo} alt="" width={40} height={40} loading="eager" className="h-10 w-10" />
+          <span className="font-display text-2xl tracking-wide">Bitezz</span>
         </Link>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/"
-            className="px-4 py-2 rounded-xl font-semibold text-gray-700 hover:bg-orange-100 hover:text-orange-500"
-          >
-            Home
-          </Link>
-
+        <div className="flex items-center gap-1">
           <Link
             href="/menu"
-            className="px-4 py-2 rounded-xl font-semibold text-gray-700 hover:bg-orange-100 hover:text-orange-500"
+            className="rounded-full px-4 py-2.5 text-sm font-semibold text-cream/90 hover:bg-white/5 hover:text-cream"
           >
             Menu
           </Link>
 
-          <Link
-            href="/cart"
-            className="px-4 py-2 rounded-xl font-semibold text-gray-700 hover:bg-orange-100 hover:text-orange-500"
+          <button
+            type="button"
+            onClick={openCart}
+            className="flex items-center gap-2 rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-cream hover:bg-brand-hover"
+            aria-label={`Open cart, ${count} ${count === 1 ? "item" : "items"}`}
           >
-            Cart ({cartCount})
-          </Link>
-
-          <Link
-            href="/track"
-            className="px-4 py-2 rounded-xl font-semibold text-gray-700 hover:bg-orange-100 hover:text-orange-500"
-          >
-            Track Order
-          </Link>
-
-          <Link
-            href="/admin-login"
-            className="bg-orange-500 text-white px-5 py-2 rounded-xl font-semibold hover:bg-orange-600"
-          >
-            Admin
-          </Link>
+            <BagIcon width={18} height={18} />
+            <span>Cart</span>
+            {count > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-cream px-1.5 text-xs font-bold text-brand tabular-nums">
+                {count}
+              </span>
+            )}
+          </button>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 }
