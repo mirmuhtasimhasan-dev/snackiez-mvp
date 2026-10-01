@@ -122,6 +122,19 @@ async function main() {
 
   await seedReviews();
 
+  // Contact links and store controls: one row, created once and never
+  // overwritten here (it is edited from admin Settings).
+  await prisma.siteSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      whatsappNumber: "01816453795",
+      facebookUrl: "https://facebook.com/bitezzbd",
+    },
+  });
+  console.log("Site settings ready.");
+
   const count = await prisma.menuItem.count();
   console.log(`Seed done. ${count} menu items in database.`);
 }

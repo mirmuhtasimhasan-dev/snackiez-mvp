@@ -12,7 +12,7 @@ export default function CategoryCircle({ src, sizes = "96px", className = "", se
 
   return (
     <span
-      className={`relative block shrink-0 overflow-hidden rounded-full ring-2 ring-offset-2 ring-offset-ink transition ${
+      className={`relative block shrink-0 overflow-hidden rounded-full ring-2 ring-offset-2 ring-offset-page transition ${
         selected ? "ring-brand" : "ring-line group-hover:ring-brand/60"
       } ${className}`}
     >
@@ -27,7 +27,7 @@ export default function CategoryCircle({ src, sizes = "96px", className = "", se
           onError={() => setFailedSrc(src)}
         />
       ) : (
-        <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#7a3b0c] via-[#3a2213] to-[#1c1612] text-highlight">
+        <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#ffe3c4] via-[#ffd2a1] to-[#ffb877] text-brand-ink">
           <FoodIcon className="h-[42%] w-[42%]" />
         </span>
       )}

@@ -15,6 +15,9 @@ import {
 } from "@/app/actions/menu";
 import { getOrders, updateOrderStatus } from "@/app/actions/orders";
 import CategoryManager from "./CategoryManager";
+import ImageUpload from "./ImageUpload";
+import StoreToggle from "./StoreToggle";
+import { IMAGE_FOLDERS } from "@/lib/storage-paths";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -290,6 +293,8 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-gray-100 px-6 py-10">
       <div className="max-w-7xl mx-auto">
+        <StoreToggle onFailure={handleFailure} />
+
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 mb-8">
           <div>
             <h1 className="text-4xl font-bold text-orange-500">
@@ -453,17 +458,13 @@ export default function DashboardPage() {
               </div>
 
               <div>
-                <label className="block text-gray-700 font-semibold mb-2">
-                  Image URL
-                </label>
-
-                <input
-                  type="text"
-                  name="image"
+                {/* Remounts per item so its unsaved-upload tracking starts fresh. */}
+                <ImageUpload
+                  key={editingItemId || "new"}
+                  label="Photo"
+                  folder={IMAGE_FOLDERS.items}
                   value={itemForm.image}
-                  onChange={handleItemFormChange}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:border-orange-500"
-                  placeholder="https://placehold.co/400x250?text=Food"
+                  onChange={(url) => setItemForm((prev) => ({ ...prev, image: url ?? "" }))}
                 />
               </div>
 
@@ -545,6 +546,7 @@ export default function DashboardPage() {
                   key={item.id}
                   className="border border-gray-200 rounded-2xl overflow-hidden"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- admin preview, any host */}
                   <img
                     src={
                       item.image || "https://placehold.co/400x250?text=Bitezz"

@@ -1,60 +1,97 @@
 import Image from "next/image";
 import Link from "next/link";
 import logo from "@/public/logo.png";
-import { WhatsAppIcon } from "./icons";
-import {
-  AREA,
-  DELIVERY_ZONES,
-  FACEBOOK_URL,
-  HOURS,
-  WHATSAPP_NUMBER,
-  whatsappLink,
-} from "@/lib/site";
+import { FacebookIcon, InstagramIcon, PhoneIcon, TikTokIcon, WhatsAppIcon } from "./icons";
+import { AREA, DELIVERY_ZONES, telLink, whatsappLink } from "@/lib/site";
 
-export default function Footer() {
+// Round 44px buttons. Each shows only when its field is set in admin Settings,
+// and takes on the platform's own colour on hover.
+function contactButtons(settings) {
+  return [
+    {
+      label: "Chat with Bitezz on WhatsApp",
+      href: whatsappLink(settings.whatsappNumber),
+      icon: WhatsAppIcon,
+      hover: "hover:border-[#25D366] hover:bg-[#25D366] hover:text-black",
+      newTab: true,
+    },
+    {
+      label: "Bitezz on Facebook",
+      href: settings.facebookUrl,
+      icon: FacebookIcon,
+      hover: "hover:border-[#1877F2] hover:bg-[#1877F2] hover:text-white",
+      newTab: true,
+    },
+    {
+      label: "Bitezz on Instagram",
+      href: settings.instagramUrl,
+      icon: InstagramIcon,
+      hover: "hover:border-[#E4405F] hover:bg-[#E4405F] hover:text-white",
+      newTab: true,
+    },
+    {
+      label: "Bitezz on TikTok",
+      href: settings.tiktokUrl,
+      icon: TikTokIcon,
+      hover: "hover:border-[#25F4EE] hover:bg-[#25F4EE] hover:text-black",
+      newTab: true,
+    },
+    {
+      label: `Call Bitezz on ${settings.phoneNumber}`,
+      href: telLink(settings.phoneNumber),
+      icon: PhoneIcon,
+      hover: "hover:border-brand hover:bg-brand hover:text-fg",
+      newTab: false,
+    },
+  ].filter((button) => button.href);
+}
+
+export default function Footer({ settings }) {
+  const buttons = contactButtons(settings);
+
   return (
-    <footer className="mt-auto border-t border-line bg-surface">
-      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-4 gap-y-5 px-4 py-6 sm:grid-cols-3 sm:gap-8 sm:py-10">
-        <div className="col-span-2 sm:col-span-1">
+    <footer className="mt-auto bg-espresso text-cream">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-5 px-4 py-6 sm:grid-cols-3 sm:gap-8 sm:py-10">
+        <div>
           <Link href="/" className="flex items-center gap-2">
             <Image src={logo} alt="" width={44} height={44} className="h-9 w-9 sm:h-11 sm:w-11" />
             <span className="font-display text-2xl tracking-wide sm:text-3xl">Bitezz</span>
           </Link>
-          <p className="mt-1 text-sm text-muted sm:mt-2">Fast Bites, Big Delight</p>
+          <p className="mt-1 text-sm text-cream/70 sm:mt-2">Fast Bites, Big Delight</p>
         </div>
 
         <div className="min-w-0 text-xs sm:text-sm">
           <h2 className="font-display text-lg tracking-wide text-highlight sm:text-xl">Hours & area</h2>
-          <p className="mt-1 text-cream/90 sm:mt-2">{HOURS}</p>
-          <p className="mt-1 text-muted">{AREA}</p>
-          <p className="mt-1 text-muted">Delivering to {DELIVERY_ZONES.slice(1).join(", ")} and all of Bashundhara</p>
+          <p className="mt-1 text-cream/90 sm:mt-2">{settings.hoursText}</p>
+          <p className="mt-1 text-cream/70">{AREA}</p>
+          <p className="mt-1 text-cream/70">
+            Delivering to {DELIVERY_ZONES.slice(1).join(", ")} and all of Bashundhara
+          </p>
         </div>
 
-        <div className="min-w-0 text-xs sm:text-sm">
-          <h2 className="font-display text-lg tracking-wide text-highlight sm:text-xl">Contact</h2>
-          <a
-            href={whatsappLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap text-cream/90 hover:text-brand sm:mt-2 sm:gap-2"
-          >
-            <WhatsAppIcon width={16} height={16} className="shrink-0" /> {WHATSAPP_NUMBER}
-          </a>
-          <a
-            href={FACEBOOK_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap text-cream/90 hover:text-brand sm:mt-2 sm:gap-2"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0">
-              <path d="M13.5 21v-7.5H16l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.3H8v3h2.5V21h3Z" />
-            </svg>
-            facebook.com/bitezzbd
-          </a>
-        </div>
+        {buttons.length > 0 && (
+          <div className="min-w-0">
+            <h2 className="font-display text-lg tracking-wide text-highlight sm:text-xl">Contact</h2>
+            <ul className="mt-2 flex flex-wrap gap-2.5 sm:mt-3">
+              {buttons.map(({ label, href, icon: Icon, hover, newTab }) => (
+                <li key={label}>
+                  <a
+                    href={href}
+                    aria-label={label}
+                    title={label}
+                    {...(newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                    className={`flex h-11 w-11 items-center justify-center rounded-full border border-cream/20 bg-cream/5 text-cream transition ${hover}`}
+                  >
+                    <Icon width={20} height={20} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
-      <p className="border-t border-line px-4 py-3 text-center text-xs text-muted sm:py-4">
+      <p className="border-t border-cream/10 px-4 py-3 text-center text-xs text-cream/70 sm:py-4">
         © {new Date().getFullYear()} Bitezz. All rights reserved.
       </p>
     </footer>

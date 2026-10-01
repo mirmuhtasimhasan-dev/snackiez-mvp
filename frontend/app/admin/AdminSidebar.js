@@ -8,6 +8,7 @@ import logo from "@/public/logo.png";
 const links = [
   { href: "/admin", label: "Orders & Menu" },
   { href: "/admin/reviews", label: "Reviews" },
+  { href: "/admin/settings", label: "Settings" },
 ];
 
 function isActive(pathname, href) {

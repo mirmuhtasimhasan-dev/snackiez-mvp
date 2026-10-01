@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, useState, useSyncExternalStore } from "react";
 import * as store from "./cart-store";
-import { DELIVERY_FEE } from "@/lib/order-config";
+import { useStore } from "./StoreProvider";
 
 const CartContext = createContext(null);
 
@@ -13,6 +13,9 @@ export function CartProvider({ children }) {
     store.getServerSnapshot
   );
   const [isOpen, setIsOpen] = useState(false);
+  // The fee is set in admin Settings; the server applies the same value.
+  const { settings } = useStore();
+  const fee = settings.deliveryFee;
 
   const value = useMemo(() => {
     const count = items.reduce((total, item) => total + item.quantity, 0);
@@ -20,7 +23,7 @@ export function CartProvider({ children }) {
       (total, item) => total + Number(item.price) * item.quantity,
       0
     );
-    const deliveryFee = items.length > 0 ? DELIVERY_FEE : 0;
+    const deliveryFee = items.length > 0 ? fee : 0;
 
     return {
       items,
@@ -37,7 +40,7 @@ export function CartProvider({ children }) {
       clearCart: store.clearCart,
       canIncrease: store.canIncrease,
     };
-  }, [items, isOpen]);
+  }, [items, isOpen, fee]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

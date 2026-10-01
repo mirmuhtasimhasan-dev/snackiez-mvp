@@ -118,3 +118,22 @@ enum PaymentStatus {
   UNPAID
   FAILED
 }
+
+// Single row (id 1): contact links and store controls, edited in admin.
+model SiteSettings {
+  id             Int      @id @default(1)
+  whatsappNumber String?
+  phoneNumber    String?
+  facebookUrl    String?
+  instagramUrl   String?
+  tiktokUrl      String?
+  deliveryFee    Int      @default(60)
+  hoursText      String   @default("Open till 4 AM")
+  // "HH:mm" in Asia/Dhaka. closeTime may be after midnight (18:00 to 04:00).
+  openTime       String?
+  closeTime      String?
+  autoSchedule   Boolean  @default(false)
+  isOpen         Boolean  @default(true)
+  closedMessage  String   @default("We are closed right now. Please order again later.")
+  updatedAt      DateTime @updatedAt
+}

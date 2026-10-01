@@ -7,10 +7,11 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { ActionError, toErrorResult } from "@/lib/action-result";
 import type { ActionResult } from "@/lib/action-result";
+import { getBkashNumber as readBkashNumber } from "@/lib/order-config";
 
 // The merchant bKash number customers send money to before checkout.
 export async function getBkashNumber(): Promise<ActionResult<string>> {
-  const bkashNumber = process.env.BKASH_NUMBER;
+  const bkashNumber = readBkashNumber();
 
   if (!bkashNumber) {
     return { success: false, message: "bKash payment is not configured" };

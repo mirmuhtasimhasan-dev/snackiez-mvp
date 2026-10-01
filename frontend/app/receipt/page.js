@@ -1,50 +1,25 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { trackOrder } from "@/app/actions/orders";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase/server";
+import { orderInclude } from "@/lib/order-status";
 
-export default function ReceiptPage() {
-  const [orderCode, setOrderCode] = useState("");
-  const [order, setOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
+// Admin only: receipts show the customer's name, phone and address.
+export default async function ReceiptPage({ searchParams }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const fetchReceipt = async (code) => {
-    try {
-      setLoading(true);
-
-      const result = await trackOrder(code);
-
-      setOrder(result.success ? result.data : null);
-    } catch (error) {
-      console.log("Receipt fetch error:", error);
-      setOrder(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-
-    if (code) {
-      setOrderCode(code);
-      fetchReceipt(code);
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-xl font-semibold text-gray-600">
-          Loading receipt...
-        </p>
-      </main>
-    );
+  if (!user) {
+    redirect("/admin/login");
   }
+
+  const { code } = await searchParams;
+  const orderCode = typeof code === "string" ? code.trim().toUpperCase() : "";
+  const order = orderCode
+    ? await prisma.order.findUnique({ where: { orderCode }, include: orderInclude })
+    : null;
 
   if (!order) {
     return (
@@ -59,10 +34,10 @@ export default function ReceiptPage() {
           </p>
 
           <Link
-            href="/menu"
+            href="/admin"
             className="inline-block mt-6 bg-orange-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-orange-600"
           >
-            Back to Menu
+            Back to Admin
           </Link>
         </div>
       </main>
@@ -76,7 +51,7 @@ export default function ReceiptPage() {
           <h1 className="text-4xl font-bold text-orange-500">Bitezz</h1>
 
           <p className="text-gray-600 mt-2">
-            Fast, Fresh & Budget-Friendly Bites
+            Fast Bites, Big Delight
           </p>
 
           <h2 className="text-2xl font-bold text-gray-900 mt-6">
@@ -173,10 +148,10 @@ export default function ReceiptPage() {
 
         <div className="mt-8 flex flex-col md:flex-row gap-4">
           <Link
-            href="/menu"
-            className="w-full text-center border border-orange-500 text-orange-500 py-3 rounded-xl font-bold hover:bg-orange-50"
+            href="/admin"
+            className="w-full text-center border border-orange-500 text-orange-500 py-3 rounded-xl font-bold hover:bg-orange-50 print:hidden"
           >
-            Order More
+            Back to Admin
           </Link>
         </div>
 

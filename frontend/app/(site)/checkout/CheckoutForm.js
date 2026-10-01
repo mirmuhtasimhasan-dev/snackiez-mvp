@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createOrder } from "@/app/actions/orders";
 import { useCart } from "@/app/components/CartProvider";
+import { useStore } from "@/app/components/StoreProvider";
 import { CheckIcon, CopyIcon } from "@/app/components/icons";
 import {
   BD_PHONE_PATTERN,
@@ -14,17 +15,17 @@ import {
 import { formatPrice } from "@/lib/site";
 
 const inputClass =
-  "mt-1.5 block h-12 w-full rounded-xl border bg-surface-2 px-4 text-base text-cream placeholder:text-muted/60 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30";
+  "mt-1.5 block h-12 w-full rounded-xl border bg-card px-4 text-base text-fg placeholder:text-muted/60 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30";
 
 function Field({ label, id, error, hint, children }) {
   return (
     <div>
-      <label htmlFor={id} className="text-sm font-medium text-cream/90">
+      <label htmlFor={id} className="text-sm font-medium text-fg/90">
         {label}
       </label>
       {children}
       {error ? (
-        <p id={`${id}-error`} className="mt-1.5 text-sm text-red-400">
+        <p id={`${id}-error`} className="mt-1.5 text-sm text-red-700">
           {error}
         </p>
       ) : hint ? (
@@ -63,6 +64,7 @@ function validate(form, paymentMethod) {
 export default function CheckoutForm({ bkashNumber }) {
   const router = useRouter();
   const { items, subtotal, deliveryFee, total, clearCart } = useCart();
+  const { settings, open, opensAt } = useStore();
 
   const [form, setForm] = useState({
     name: "",
@@ -80,6 +82,8 @@ export default function CheckoutForm({ bkashNumber }) {
   const [submitting, setSubmitting] = useState(false);
   const [placed, setPlaced] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Set synchronously so a fast double tap cannot send two orders.
+  const submittingRef = useRef(false);
 
   const update = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -108,6 +112,7 @@ export default function CheckoutForm({ bkashNumber }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (submittingRef.current || !open) return;
     setSubmitError("");
 
     const found = validate(form, paymentMethod);
@@ -119,6 +124,7 @@ export default function CheckoutForm({ bkashNumber }) {
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
 
     try {
@@ -136,6 +142,7 @@ export default function CheckoutForm({ bkashNumber }) {
 
       if (!result.success) {
         setSubmitError(result.message);
+        submittingRef.current = false;
         setSubmitting(false);
         return;
       }
@@ -145,6 +152,7 @@ export default function CheckoutForm({ bkashNumber }) {
       router.push(`/order-success?code=${encodeURIComponent(result.data.orderCode)}`);
     } catch {
       setSubmitError("Could not place your order. Please check your connection and try again.");
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -155,12 +163,12 @@ export default function CheckoutForm({ bkashNumber }) {
 
   if (items.length === 0) {
     return (
-      <div className="mt-10 rounded-2xl border border-line bg-surface p-8 text-center">
+      <div className="mt-10 rounded-2xl border border-line bg-card p-8 text-center shadow-soft">
         <p className="text-lg font-semibold">Your cart is empty</p>
         <p className="mt-1 text-sm text-muted">Add something tasty before checking out.</p>
         <Link
           href="/menu"
-          className="mt-5 inline-flex h-12 items-center rounded-full bg-brand px-6 font-semibold text-cream hover:bg-brand-hover"
+          className="mt-5 inline-flex h-12 items-center rounded-full bg-brand px-6 font-semibold text-fg hover:bg-brand-hover"
         >
           Browse Menu
         </Link>
@@ -249,10 +257,12 @@ export default function CheckoutForm({ bkashNumber }) {
               <label
                 key={option.value}
                 className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand ${
-                  paymentMethod === option.value
-                    ? "border-brand bg-brand/10"
-                    : "border-line bg-surface hover:border-white/20"
-                } ${option.disabled ? "cursor-not-allowed opacity-50" : ""}`}
+                  option.disabled
+                    ? "cursor-not-allowed border-line bg-alt"
+                    : paymentMethod === option.value
+                      ? "border-brand bg-brand/10"
+                      : "border-line bg-card hover:border-fg/20"
+                }`}
               >
                 <input
                   type="radio"
@@ -264,7 +274,9 @@ export default function CheckoutForm({ bkashNumber }) {
                   className="mt-1 h-4 w-4 accent-brand"
                 />
                 <span>
-                  <span className="block font-semibold">{option.title}</span>
+                  <span className={`block font-semibold ${option.disabled ? "text-muted" : ""}`}>
+                    {option.title}
+                  </span>
                   <span className="block text-sm text-muted">{option.detail}</span>
                 </span>
               </label>
@@ -273,18 +285,18 @@ export default function CheckoutForm({ bkashNumber }) {
 
           {paymentMethod === "BKASH" && bkashNumber && (
             <div className="mt-4 space-y-4 rounded-2xl border border-pink-500/30 bg-pink-500/5 p-4">
-              <ol className="list-decimal space-y-2 pl-5 text-sm text-cream/90 marker:font-semibold marker:text-pink-400">
+              <ol className="list-decimal space-y-2 pl-5 text-sm text-fg/90 marker:font-semibold marker:text-pink-600">
                 <li>
                   Open the bKash app and tap <strong>Send Money</strong>.
                 </li>
                 <li>
                   Enter our number:
-                  <span className="ml-2 inline-flex items-center gap-2 rounded-lg bg-black/40 px-2 py-1 font-mono text-base font-semibold text-cream">
+                  <span className="ml-2 inline-flex items-center gap-2 rounded-lg bg-black/40 px-2 py-1 font-mono text-base font-semibold text-fg">
                     {bkashNumber}
                     <button
                       type="button"
                       onClick={copyBkashNumber}
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-cream/80 hover:bg-white/10 hover:text-cream"
+                      className="flex h-7 w-7 items-center justify-center rounded-md text-fg/80 hover:bg-fg/10 hover:text-fg"
                       aria-label="Copy bKash number"
                     >
                       {copied ? <CheckIcon width={16} height={16} /> : <CopyIcon width={16} height={16} />}
@@ -292,7 +304,7 @@ export default function CheckoutForm({ bkashNumber }) {
                   </span>
                 </li>
                 <li>
-                  Send exactly <strong className="text-cream">{formatPrice(total)}</strong>.
+                  Send exactly <strong className="text-fg">{formatPrice(total)}</strong>.
                 </li>
                 <li>Confirm with your PIN.</li>
                 <li>Enter the Transaction ID from the confirmation SMS below.</li>
@@ -323,13 +335,13 @@ export default function CheckoutForm({ bkashNumber }) {
         </fieldset>
       </div>
 
-      <aside className="h-fit rounded-2xl border border-line bg-surface p-5 lg:sticky lg:top-24">
+      <aside className="h-fit rounded-2xl border border-line bg-card p-5 shadow-soft lg:sticky lg:top-24">
         <h2 className="font-display text-2xl tracking-wide">Order summary</h2>
 
         <ul className="mt-4 divide-y divide-line text-sm">
           {items.map((item) => (
             <li key={item.id} className="flex justify-between gap-3 py-2.5">
-              <span className="text-cream/90">
+              <span className="text-fg/90">
                 {item.name} <span className="text-muted">× {item.quantity}</span>
               </span>
               <span className="shrink-0 tabular-nums">
@@ -340,11 +352,11 @@ export default function CheckoutForm({ bkashNumber }) {
         </ul>
 
         <dl className="mt-3 space-y-2 border-t border-line pt-3 text-sm">
-          <div className="flex justify-between text-cream/80">
+          <div className="flex justify-between text-fg/80">
             <dt>Subtotal</dt>
             <dd className="tabular-nums">{formatPrice(subtotal)}</dd>
           </div>
-          <div className="flex justify-between text-cream/80">
+          <div className="flex justify-between text-fg/80">
             <dt>Delivery fee</dt>
             <dd className="tabular-nums">{formatPrice(deliveryFee)}</dd>
           </div>
@@ -354,18 +366,29 @@ export default function CheckoutForm({ bkashNumber }) {
           </div>
         </dl>
 
+        {!open && (
+          <p role="status" className="mt-4 rounded-xl bg-alt p-3 text-sm font-medium text-fg">
+            {settings.closedMessage}
+            {opensAt && <span className="font-semibold"> Opens at {opensAt}.</span>}
+          </p>
+        )}
+
         {submitError && (
-          <p role="alert" className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-300">
+          <p role="alert" className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-700">
             {submitError}
           </p>
         )}
 
         <button
           type="submit"
-          disabled={submitting}
-          className="mt-5 flex h-13 w-full items-center justify-center rounded-full bg-brand py-3.5 font-display text-2xl tracking-wider text-cream transition hover:bg-brand-hover active:scale-[0.99] disabled:opacity-60"
+          disabled={submitting || !open}
+          className="mt-5 flex h-13 w-full items-center justify-center rounded-full bg-brand py-3.5 font-display text-2xl tracking-wider text-fg transition hover:bg-brand-hover active:scale-[0.99] disabled:opacity-60"
         >
-          {submitting ? "Placing order…" : `Place Order · ${formatPrice(total)}`}
+          {submitting
+            ? "Placing order…"
+            : open
+              ? `Place Order · ${formatPrice(total)}`
+              : "Closed right now"}
         </button>
 
         <p className="mt-3 text-center text-xs text-muted">

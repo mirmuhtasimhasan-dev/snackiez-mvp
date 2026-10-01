@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import type { Category, MenuItem } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { deleteImageIfUnused } from "@/lib/storage-server";
 import { ActionError, toErrorResult } from "@/lib/action-result";
 import type { ActionResult } from "@/lib/action-result";
 import type {
@@ -17,6 +19,18 @@ function revalidateMenu() {
   revalidatePath("/");
   revalidatePath("/menu");
   revalidatePath("/admin");
+}
+
+// Empty strings from forms mean "no image".
+function normalizeImage(image: string | null | undefined) {
+  return image === undefined ? undefined : image?.trim() || null;
+}
+
+// Deletes a replaced or removed upload once the response is sent.
+function cleanUpImage(previous: string | null | undefined, next: string | null | undefined) {
+  if (previous && previous !== next) {
+    after(() => deleteImageIfUnused(previous));
+  }
 }
 
 function parseStockQty(value: number | string | undefined) {
@@ -105,10 +119,12 @@ export async function updateCategory(
   try {
     await requireAdmin();
 
+    const previous = await prisma.category.findUnique({ where: { id }, select: { image: true } });
     const category = await prisma.category.update({
       where: { id },
       data: parseCategory(input ?? {}, true),
     });
+    if (input?.image !== undefined) cleanUpImage(previous?.image, category.image);
 
     revalidateMenu();
     return { success: true, message: "Category updated successfully", data: category };
@@ -121,7 +137,8 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
   try {
     await requireAdmin();
 
-    await prisma.category.delete({ where: { id } });
+    const deleted = await prisma.category.delete({ where: { id } });
+    cleanUpImage(deleted.image, null);
 
     revalidateMenu();
     return { success: true, message: "Category deleted successfully", data: null };
@@ -147,7 +164,7 @@ export async function createMenuItem(
         name: input.name.trim(),
         description: input.description,
         price: parsePrice(input.price),
-        image: input.image,
+        image: normalizeImage(input.image),
         categoryId: input.categoryId,
         isAvailable: input.isAvailable,
         isFeatured: input.isFeatured,
@@ -202,13 +219,14 @@ export async function updateMenuItem(
   try {
     await requireAdmin();
 
+    const previous = await prisma.menuItem.findUnique({ where: { id }, select: { image: true } });
     const menuItem = await prisma.menuItem.update({
       where: { id },
       data: {
         name: input.name?.trim(),
         description: input.description,
         price: input.price !== undefined ? parsePrice(input.price) : undefined,
-        image: input.image,
+        image: normalizeImage(input.image),
         categoryId: input.categoryId,
         isAvailable: input.isAvailable,
         isFeatured: input.isFeatured,
@@ -216,6 +234,7 @@ export async function updateMenuItem(
       },
       include: { category: true },
     });
+    if (input.image !== undefined) cleanUpImage(previous?.image, menuItem.image);
 
     revalidateMenu();
     return { success: true, message: "Menu item updated successfully", data: menuItem };
@@ -301,7 +320,8 @@ export async function deleteMenuItem(id: string): Promise<ActionResult> {
   try {
     await requireAdmin();
 
-    await prisma.menuItem.delete({ where: { id } });
+    const deleted = await prisma.menuItem.delete({ where: { id } });
+    cleanUpImage(deleted.image, null);
 
     revalidateMenu();
     return { success: true, message: "Menu item deleted successfully", data: null };

@@ -1,7 +1,5 @@
 // How a category appears as a round icon on the home page and menu tabs.
 
-export const CATEGORY_IMAGE_FOLDER = "categories";
-
 // Words dropped when a category has no shortName ("Fries Favourites" -> "Fries").
 const FILLER_WORDS = /\b(specials?|favou?rites?|corner|items?)\b/gi;
 

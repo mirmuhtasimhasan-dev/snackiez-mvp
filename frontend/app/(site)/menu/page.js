@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { categoryImage, categoryShortName } from "@/lib/categories";
+import { getSiteSettings } from "@/lib/settings";
 import MenuBrowser from "./MenuBrowser";
 
 export const metadata = {
@@ -11,6 +12,7 @@ export default async function MenuPage({ searchParams }) {
   // Stock changes with every order, so always render with fresh data.
   await connection();
   const { category: requestedCategory } = await searchParams;
+  const settings = await getSiteSettings();
 
   const categories = await prisma.category.findMany({
     orderBy: { createdAt: "asc" },
@@ -51,10 +53,10 @@ export default async function MenuPage({ searchParams }) {
   return (
     <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
       <h1 className="font-display text-5xl tracking-wide sm:text-6xl">Menu</h1>
-      <p className="mt-1 text-muted">Made fresh, delivered hot till 4 AM.</p>
+      <p className="mt-1 text-muted">Made fresh, delivered hot. {settings.hoursText}.</p>
 
       {withItems.length === 0 ? (
-        <p className="mt-12 rounded-2xl border border-line bg-surface p-8 text-center text-muted">
+        <p className="mt-12 rounded-2xl border border-line bg-card p-8 text-center text-muted">
           The menu is being updated. Please check back soon.
         </p>
       ) : (

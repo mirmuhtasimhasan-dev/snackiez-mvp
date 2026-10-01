@@ -46,97 +46,105 @@ export async function changeOrderStatus(
     throw new ActionError("Invalid order status");
   }
 
-  return prisma.$transaction(async (tx) => {
-    const current = await tx.order.findUnique({
-      where: { id },
-      include: orderInclude,
-    });
+  const unchanged = await prisma.$transaction(
+    async (tx) => {
+      const current = await tx.order.findUnique({
+        where: { id },
+        include: orderInclude,
+      });
 
-    if (!current) {
-      throw new ActionError("Order not found");
-    }
+      if (!current) {
+        throw new ActionError("Order not found");
+      }
 
-    if (options.expectedStatus && current.status !== options.expectedStatus) {
-      throw new ActionError(`Order is already ${current.status.toLowerCase()}`);
-    }
+      if (options.expectedStatus && current.status !== options.expectedStatus) {
+        throw new ActionError(`Order is already ${current.status.toLowerCase()}`);
+      }
 
-    if (current.status === status) {
-      return current;
-    }
+      if (current.status === status) {
+        return current;
+      }
 
-    if (current.status === OrderStatus.CANCELLED) {
-      throw new ActionError("Cancelled orders cannot be changed");
-    }
+      if (current.status === OrderStatus.CANCELLED) {
+        throw new ActionError("Cancelled orders cannot be changed");
+      }
 
-    // Guard against two admins changing the same order at once, which
-    // would otherwise deduct stock twice.
-    const claimed = await tx.order.updateMany({
-      where: { id, status: current.status },
-      data: { status },
-    });
+      // Guard against two admins changing the same order at once, which
+      // would otherwise deduct stock twice.
+      const claimed = await tx.order.updateMany({
+        where: { id, status: current.status },
+        data: { status },
+      });
 
-    if (claimed.count === 0) {
-      throw new ActionError("Order was updated by someone else. Please refresh.");
-    }
+      if (claimed.count === 0) {
+        throw new ActionError("Order was updated by someone else. Please refresh.");
+      }
 
-    if (current.status === OrderStatus.PENDING && ACCEPTED_STATUSES.includes(status)) {
-      const quantities = sumQuantities(current.items);
+      if (current.status === OrderStatus.PENDING && ACCEPTED_STATUSES.includes(status)) {
+        const quantities = sumQuantities(current.items);
 
-      for (const [menuItemId, quantity] of quantities) {
-        const updated = await tx.menuItem.updateMany({
-          where: { id: menuItemId, stockQty: { gte: quantity } },
-          data: { stockQty: { decrement: quantity } },
+        for (const [menuItemId, quantity] of quantities) {
+          const updated = await tx.menuItem.updateMany({
+            where: { id: menuItemId, stockQty: { gte: quantity } },
+            data: { stockQty: { decrement: quantity } },
+          });
+
+          if (updated.count === 0) {
+            const name =
+              current.items.find((item) => item.menuItemId === menuItemId)?.menuItem.name ??
+              "an item";
+            throw new ActionError(`Not enough stock for ${name}`);
+          }
+        }
+
+        await tx.menuItem.updateMany({
+          where: { id: { in: [...quantities.keys()] }, stockQty: { lte: 0 } },
+          data: { isAvailable: false },
         });
+      }
 
-        if (updated.count === 0) {
-          const name =
-            current.items.find((item) => item.menuItemId === menuItemId)?.menuItem.name ??
-            "an item";
-          throw new ActionError(`Not enough stock for ${name}`);
+      // Cancelling an order whose stock was already deducted puts it back.
+      // Items that had sold out (stock 0) become available again.
+      if (status === OrderStatus.CANCELLED && ACCEPTED_STATUSES.includes(current.status)) {
+        const quantities = sumQuantities(current.items);
+        const soldOutIds = current.items
+          .filter((item) => item.menuItem.stockQty <= 0)
+          .map((item) => item.menuItemId);
+
+        for (const [menuItemId, quantity] of quantities) {
+          await tx.menuItem.update({
+            where: { id: menuItemId },
+            data: { stockQty: { increment: quantity } },
+          });
+        }
+
+        if (soldOutIds.length > 0) {
+          await tx.menuItem.updateMany({
+            where: { id: { in: soldOutIds }, stockQty: { gt: 0 } },
+            data: { isAvailable: true },
+          });
         }
       }
 
-      await tx.menuItem.updateMany({
-        where: { id: { in: [...quantities.keys()] }, stockQty: { lte: 0 } },
-        data: { isAvailable: false },
-      });
-    }
-
-    // Cancelling an order whose stock was already deducted puts it back.
-    // Items that had sold out (stock 0) become available again.
-    if (status === OrderStatus.CANCELLED && ACCEPTED_STATUSES.includes(current.status)) {
-      const quantities = sumQuantities(current.items);
-      const soldOutIds = current.items
-        .filter((item) => item.menuItem.stockQty <= 0)
-        .map((item) => item.menuItemId);
-
-      for (const [menuItemId, quantity] of quantities) {
-        await tx.menuItem.update({
-          where: { id: menuItemId },
-          data: { stockQty: { increment: quantity } },
+      // Cash on delivery is collected at the door.
+      if (
+        status === OrderStatus.DELIVERED &&
+        current.payment?.method === PaymentMethod.CASH &&
+        current.payment.status !== PaymentStatus.PAID
+      ) {
+        await tx.payment.update({
+          where: { orderId: id },
+          data: { status: PaymentStatus.PAID },
         });
       }
 
-      if (soldOutIds.length > 0) {
-        await tx.menuItem.updateMany({
-          where: { id: { in: soldOutIds }, stockQty: { gt: 0 } },
-          data: { isAvailable: true },
-        });
-      }
-    }
+      return null;
+    },
+    // The database is in Singapore; every query is a network round trip, so
+    // allow more than the 5s default before Prisma abandons the transaction.
+    { maxWait: 10_000, timeout: 20_000 }
+  );
 
-    // Cash on delivery is collected at the door.
-    if (
-      status === OrderStatus.DELIVERED &&
-      current.payment?.method === PaymentMethod.CASH &&
-      current.payment.status !== PaymentStatus.PAID
-    ) {
-      await tx.payment.update({
-        where: { orderId: id },
-        data: { status: PaymentStatus.PAID },
-      });
-    }
-
-    return tx.order.findUniqueOrThrow({ where: { id }, include: orderInclude });
-  });
+  // Read the result after commit so the transaction stays short.
+  return unchanged ?? prisma.order.findUniqueOrThrow({ where: { id }, include: orderInclude });
 }

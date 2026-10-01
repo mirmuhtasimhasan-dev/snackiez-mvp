@@ -1,18 +1,12 @@
 import { getImageProps } from "next/image";
 import Link from "next/link";
 import { connection } from "next/server";
-import heroDesktop from "@/public/hero-bg.webp";
-import heroMobile from "@/public/hero-bg-mobile.webp";
+import heroDesktop from "@/public/hero-light.webp";
+import heroMobile from "@/public/hero-light-mobile.webp";
 import { prisma } from "@/lib/prisma";
-import { DELIVERY_FEE } from "@/lib/order-config";
 import { categoryImage, categoryShortName } from "@/lib/categories";
-import {
-  DELIVERY_ZONES,
-  HOURS,
-  WHATSAPP_NUMBER,
-  formatPrice,
-  whatsappLink,
-} from "@/lib/site";
+import { getSiteSettings } from "@/lib/settings";
+import { DELIVERY_ZONES, formatPrice, whatsappLink } from "@/lib/site";
 import AddToCartButton from "@/app/components/AddToCartButton";
 import CategoryCircle from "@/app/components/CategoryCircle";
 import FallbackImage from "@/app/components/FallbackImage";
@@ -45,18 +39,25 @@ const menuCardSelect = {
   stockQty: true,
 };
 
-const info = [
-  { icon: MoonIcon, title: "Late Night Delivery", detail: "Cravings after midnight? We got you." },
-  { icon: ClockIcon, title: HOURS, detail: "Hot food, every night." },
-  { icon: PinIcon, title: "Bashundhara R/A only", detail: "NSU, IUB, NISS and around" },
-  { icon: CashIcon, title: "Cash on Delivery", detail: "Or pay with bKash" },
-  {
-    icon: WhatsAppIcon,
-    title: `WhatsApp ${WHATSAPP_NUMBER}`,
-    detail: "Questions? Message us",
-    href: whatsappLink(),
-  },
-];
+// Hours, WhatsApp number and delivery fee come from admin Settings.
+function buildInfo(settings) {
+  return [
+    { icon: MoonIcon, title: "Late Night Delivery", detail: "Cravings after midnight? We got you." },
+    { icon: ClockIcon, title: settings.hoursText, detail: "Hot food, every night." },
+    { icon: PinIcon, title: "Bashundhara R/A only", detail: "NSU, IUB, NISS and around" },
+    { icon: CashIcon, title: "Cash on Delivery", detail: "Or pay with bKash" },
+    settings.whatsappNumber && {
+      icon: WhatsAppIcon,
+      title: `WhatsApp ${settings.whatsappNumber}`,
+      detail: "Questions? Message us",
+      href: whatsappLink(settings.whatsappNumber),
+    },
+  ].filter(Boolean);
+}
+
+function feeLabel(fee) {
+  return fee > 0 ? formatPrice(fee) : "Free";
+}
 
 const mobileChips = [
   { icon: MoonIcon, label: "Late Night" },
@@ -65,7 +66,7 @@ const mobileChips = [
 ];
 
 const reasons = [
-  { icon: MoonIcon, title: "Late Night", text: "Kitchen stays open till 4 AM for study nights and midnight cravings." },
+  { icon: MoonIcon, title: "Late Night", text: "The kitchen stays open late for study nights and midnight cravings." },
   { icon: CheckIcon, title: "Fresh Made", text: "Every order is cooked when you place it. Nothing sits under a lamp." },
   { icon: BagIcon, title: "Fast Delivery", text: "We only deliver inside Bashundhara, so food reaches you hot." },
   { icon: CashIcon, title: "COD or bKash", text: "Pay cash at the door or send money with bKash. Your choice." },
@@ -77,30 +78,35 @@ const steps = [
   { title: "Eat it hot", text: "We cook it fresh and our rider brings it to your door." },
 ];
 
-const faqs = [
-  {
-    q: "How long does delivery take?",
-    a: "Usually within 30 minutes inside Bashundhara R/A. Late night rush can take a little longer.",
-  },
-  {
-    q: "What is the delivery charge?",
-    a: `A flat ${formatPrice(DELIVERY_FEE)} on every order, shown at checkout before you place it.`,
-  },
-  {
-    q: "How can I pay?",
-    a: "Cash on Delivery, or bKash Send Money. For bKash, send the total to our number and enter the Transaction ID at checkout. We verify it before cooking.",
-  },
-  {
-    q: "Which areas do you deliver to?",
-    a: "Bashundhara R/A only, including NSU, IUB and NISS. Enter your block, road and house at checkout.",
-  },
-];
+function buildFaqs(settings) {
+  return [
+    {
+      q: "How long does delivery take?",
+      a: "Usually within 30 minutes inside Bashundhara R/A. Late night rush can take a little longer.",
+    },
+    {
+      q: "What is the delivery charge?",
+      a:
+        settings.deliveryFee > 0
+          ? `A flat ${formatPrice(settings.deliveryFee)} on every order, shown at checkout before you place it.`
+          : "Delivery is free right now.",
+    },
+    {
+      q: "How can I pay?",
+      a: "Cash on Delivery, or bKash Send Money. For bKash, send the total to our number and enter the Transaction ID at checkout. We verify it before cooking.",
+    },
+    {
+      q: "Which areas do you deliver to?",
+      a: "Bashundhara R/A only, including NSU, IUB and NISS. Enter your block, road and house at checkout.",
+    },
+  ];
+}
 
 function SectionHeading({ eyebrow, title, children }) {
   return (
     <div className="max-w-2xl">
       {eyebrow && (
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-highlight sm:text-sm">{eyebrow}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-highlight-ink sm:text-sm">{eyebrow}</p>
       )}
       <h2 className="mt-1 font-display text-4xl leading-none tracking-wide sm:text-6xl">{title}</h2>
       {children && <p className="mt-2 text-sm text-muted sm:mt-3 sm:text-base">{children}</p>}
@@ -110,7 +116,7 @@ function SectionHeading({ eyebrow, title, children }) {
 
 function Stars({ rating }) {
   return (
-    <p className="text-lg leading-none text-highlight" aria-label={`${rating} out of 5 stars`}>
+    <p className="text-lg leading-none text-highlight-ink" aria-label={`${rating} out of 5 stars`}>
       {"★".repeat(rating)}
       <span className="text-line">{"★".repeat(5 - rating)}</span>
     </p>
@@ -123,7 +129,7 @@ function Stars({ rating }) {
 // which image is the LCP depends on the viewport.
 function HeroImage() {
   const common = {
-    alt: "Shawarma wrap, crispy chicken burger, fries and fried chicken tenders",
+    alt: "Chicken wraps, a crispy chicken burger, fries and fried chicken tenders",
     sizes: "100vw",
   };
   const {
@@ -141,14 +147,15 @@ function HeroImage() {
         <img
           {...imgProps}
           srcSet={mobileSrcSet}
-          className="block h-[70vh] w-full object-cover object-top lg:h-full lg:object-right"
+          className="block h-[45vh] w-full object-cover object-center lg:h-full lg:object-right"
         />
       </picture>
 
-      {/* Below lg: fade the lower 55% into the page so the text on it reads. */}
+      {/* Below lg: a short fade on the bottom edge only, so the photo runs
+          into the text block below it. The rest of the image has no overlay. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-ink via-ink/75 to-transparent lg:hidden"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[15%] bg-gradient-to-t from-hero to-transparent lg:hidden"
       />
     </div>
   );
@@ -200,62 +207,63 @@ export default async function HomePage() {
   // Best sellers show live stock, so render per request.
   await connection();
   const { bestSellers, categories, newItem, reviews } = await getHomeData();
+  const settings = await getSiteSettings();
+  const info = buildInfo(settings);
+  const faqs = buildFaqs(settings);
+  const whatsappHref = whatsappLink(settings.whatsappNumber);
 
   return (
     <main>
-      {/* 1. Hero */}
-      <section className="relative overflow-hidden lg:flex lg:min-h-[90vh] lg:items-center">
+      {/* 1. Hero: light. #FDF7EF matches the photo's own background, so the
+          image edges blend into the section. */}
+      <section className="relative overflow-hidden bg-hero lg:flex lg:min-h-[85vh] lg:items-center">
         <HeroImage />
 
-        {/* Desktop: darken the left for the text and fade the bottom into the page. */}
+        {/* Desktop: soft wash on the left so the text stays readable. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 hidden bg-gradient-to-r from-ink from-20% via-ink/70 via-45% to-transparent to-75% lg:block"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-48 bg-gradient-to-t from-ink to-transparent lg:block"
+          className="pointer-events-none absolute inset-0 hidden bg-gradient-to-r from-hero from-20% via-hero/70 via-36% to-transparent to-54% lg:block"
         />
 
-        {/* Below lg the text sits over the bottom of the image; from lg up it
-            is the original left column over the full-bleed background. */}
-        <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-5 lg:relative lg:inset-auto lg:mx-auto lg:w-full lg:max-w-6xl lg:py-24">
+        {/* Below lg the text sits under the image on the solid hero colour;
+            from lg up it is the left column over the full-bleed background. */}
+        <div className="relative z-10 px-4 pb-4 pt-2 lg:mx-auto lg:w-full lg:max-w-6xl lg:py-24">
           <div className="max-w-xl">
-            <p className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-highlight/30 bg-ink/60 px-3 py-1 text-xs font-semibold text-highlight backdrop-blur-sm lg:bg-highlight/10 lg:py-1.5 lg:text-sm lg:backdrop-blur-none">
-              <span className="h-2 w-2 rounded-full bg-highlight" aria-hidden="true" />
+            <p className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-brand/30 bg-card/80 px-3 py-1 text-xs font-semibold text-brand-ink backdrop-blur-sm lg:py-1.5 lg:text-sm">
+              <span className="h-2 w-2 rounded-full bg-brand" aria-hidden="true" />
               <span>
-                Open till 4 AM<span className="hidden lg:inline"> in Bashundhara R/A</span>
+                {settings.hoursText}
+                <span className="hidden lg:inline"> in Bashundhara R/A</span>
               </span>
             </p>
 
-            <h1 className="mt-2.5 font-display text-[2.5rem] leading-[0.95] tracking-wide drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] lg:mt-5 lg:text-8xl lg:leading-[0.92] lg:drop-shadow-none">
+            <h1 className="mt-2.5 font-display text-[2.5rem] leading-[0.95] tracking-wide text-fg lg:mt-5 lg:text-8xl lg:leading-[0.92]">
               <span className="block lg:inline">Late Night</span>{" "}
-              <span className="text-brand lg:text-cream">Hungry?</span>{" "}
-              <span className="hidden text-brand lg:inline">We Deliver.</span>
+              <span className="text-brand-ink">Hungry?</span>
             </h1>
 
-            <p className="mt-5 hidden max-w-md text-lg text-muted lg:block">
-              Shawarma, burgers, loaded fries and crispy chicken, cooked fresh and
-              delivered hot across Bashundhara.
+            <p className="mt-4 hidden text-2xl font-semibold text-fg/80 lg:block">
+              Fast Bites, Big Delight
             </p>
 
             <div className="mt-4 flex items-center gap-3 lg:mt-8">
               <Link
                 href="/menu"
-                className="inline-flex h-12 min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-full bg-brand px-6 font-display text-2xl tracking-wider text-cream shadow-lg shadow-brand/30 transition hover:bg-brand-hover active:scale-[0.98] lg:h-14 lg:flex-none lg:px-10"
+                className="inline-flex h-12 min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-full bg-brand px-6 font-display text-2xl tracking-wider text-fg shadow-lg shadow-brand/30 transition hover:bg-brand-hover active:scale-[0.98] lg:h-14 lg:flex-none lg:px-10"
               >
                 Order Now
               </Link>
-              <a
-                href={whatsappLink()}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="WhatsApp Us"
-                className="inline-flex h-12 w-12 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[#25D366]/40 bg-[#25D366]/15 text-[#25D366] transition hover:border-cream/30 lg:h-14 lg:w-auto lg:border-line lg:bg-surface lg:px-8 lg:font-semibold lg:text-cream"
-              >
-                <WhatsAppIcon width={22} height={22} />
-                <span className="hidden lg:inline">WhatsApp Us</span>
-              </a>
+              {whatsappHref && (
+                <a
+                  href={whatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden h-14 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-line bg-card px-8 font-semibold text-fg shadow-soft transition hover:border-fg/30 lg:inline-flex"
+                >
+                  <WhatsAppIcon width={22} height={22} className="text-[#0E7A3D]" />
+                  WhatsApp Us
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -263,14 +271,14 @@ export default async function HomePage() {
 
       {/* Phones and tablets: the three info points not already in the hero
           (hours are in the tag, WhatsApp is the round button). */}
-      <section aria-label="Delivery info" className="border-b border-line lg:hidden">
+      <section aria-label="Delivery info" className="border-b border-line bg-hero lg:hidden">
         <ul className="mx-auto grid max-w-6xl grid-cols-3 gap-2 px-4 py-3">
           {mobileChips.map(({ icon: Icon, label }) => (
             <li
               key={label}
-              className="flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface px-2 py-2 text-[11px] font-semibold text-cream/90 min-[375px]:text-xs"
+              className="flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-card px-2 py-2 text-[11px] font-semibold text-fg/90 min-[375px]:text-xs"
             >
-              <Icon width={14} height={14} className="shrink-0 text-brand" />
+              <Icon width={14} height={14} className="shrink-0 text-brand-ink" />
               {label}
             </li>
           ))}
@@ -278,16 +286,16 @@ export default async function HomePage() {
       </section>
 
       {/* 2. Info strip */}
-      <section aria-label="Delivery info" className="hidden border-y border-line bg-surface lg:block">
+      <section aria-label="Delivery info" className="hidden border-y border-line bg-alt lg:block">
         <ul className="mx-auto grid max-w-6xl grid-cols-1 divide-y divide-line px-4 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-5">
           {info.map(({ icon: Icon, title, detail, href }) => {
             const content = (
               <>
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/15 text-brand sm:h-10 sm:w-10">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/15 text-brand-ink sm:h-10 sm:w-10">
                   <Icon width={18} height={18} />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-cream sm:text-base">{title}</span>
+                  <span className="block text-sm font-semibold text-fg sm:text-base">{title}</span>
                   <span className="block text-xs text-muted sm:text-sm">{detail}</span>
                 </span>
               </>
@@ -315,7 +323,7 @@ export default async function HomePage() {
             <SectionHeading eyebrow="Most ordered" title="Best Sellers" />
             <Link
               href="/menu"
-              className="shrink-0 whitespace-nowrap text-sm font-semibold text-brand hover:underline sm:text-base"
+              className="shrink-0 whitespace-nowrap text-sm font-semibold text-brand-ink hover:underline sm:text-base"
             >
               See all →
             </Link>
@@ -358,7 +366,7 @@ export default async function HomePage() {
                     sizes="(min-width: 1024px) 96px, 72px"
                     className="h-[72px] w-[72px] lg:h-24 lg:w-24"
                   />
-                  <span className="w-full truncate text-center text-xs font-semibold text-cream/90 group-hover:text-brand lg:text-sm">
+                  <span className="w-full truncate text-center text-xs font-semibold text-fg/90 group-hover:text-brand-ink lg:text-sm">
                     {categoryShortName(category)}
                   </span>
                 </Link>
@@ -370,21 +378,21 @@ export default async function HomePage() {
 
       {/* 5. New item banner */}
       <section className="mx-auto max-w-6xl px-4 pb-8 sm:pb-16">
-        <Reveal className="relative grid overflow-hidden rounded-3xl border border-brand/30 bg-gradient-to-br from-brand/25 via-surface to-surface sm:rounded-[2rem] md:grid-cols-2">
+        <Reveal className="relative grid overflow-hidden rounded-3xl border border-brand/25 bg-gradient-to-br from-[#ffe1c2] via-card to-card shadow-soft sm:rounded-[2rem] md:grid-cols-2">
           <div className="relative z-10 p-5 sm:p-10">
-            <span className="inline-block rounded-full bg-highlight px-3 py-1 text-xs font-bold uppercase tracking-wider text-ink">
+            <span className="inline-block rounded-full bg-highlight px-3 py-1 text-xs font-bold uppercase tracking-wider text-fg">
               New
             </span>
             <h2 className="mt-3 font-display text-4xl leading-none tracking-wide sm:mt-4 sm:text-6xl">
               {NEW_ITEM_NAME}
             </h2>
-            <p className="mt-2 line-clamp-3 max-w-sm text-sm text-cream/85 sm:mt-3 sm:text-base">
+            <p className="mt-2 line-clamp-3 max-w-sm text-sm text-fg/85 sm:mt-3 sm:text-base">
               {newItem?.description ??
                 "Mini burgers with juicy patty, BBQ sauce, cheese and lettuce. Small size, big flavor."}
             </p>
             <p
               data-nowrap
-              className="mt-4 whitespace-nowrap font-display text-3xl tracking-wide text-highlight sm:mt-5 sm:text-4xl"
+              className="mt-4 whitespace-nowrap font-display text-3xl tracking-wide text-highlight-ink sm:mt-5 sm:text-4xl"
             >
               {formatPrice(newItem?.price ?? NEW_ITEM_PRICE)}
             </p>
@@ -394,7 +402,7 @@ export default async function HomePage() {
               ) : (
                 <Link
                   href="/menu"
-                  className="inline-flex h-12 items-center rounded-full bg-brand px-6 font-semibold text-cream hover:bg-brand-hover"
+                  className="inline-flex h-12 items-center rounded-full bg-brand px-6 font-semibold text-fg hover:bg-brand-hover"
                 >
                   Order Now
                 </Link>
@@ -413,7 +421,7 @@ export default async function HomePage() {
       </section>
 
       {/* 6. Why Bitezz */}
-      <section className="border-y border-line bg-surface">
+      <section className="border-y border-line bg-alt">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:py-16">
           <Reveal>
             <SectionHeading eyebrow="Why us" title="Why Bitezz" />
@@ -424,9 +432,9 @@ export default async function HomePage() {
                 as="li"
                 key={title}
                 delay={index * 80}
-                className="rounded-2xl border border-line bg-ink p-3 sm:p-5"
+                className="rounded-2xl border border-line bg-card p-3 shadow-soft sm:p-5"
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/15 text-brand sm:h-12 sm:w-12 sm:rounded-2xl">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/15 text-brand-ink sm:h-12 sm:w-12 sm:rounded-2xl">
                   <Icon width={18} height={18} className="sm:h-6 sm:w-6" />
                 </span>
                 <h3 className="mt-2 whitespace-nowrap font-display text-xl tracking-wide sm:mt-4 sm:text-3xl">
@@ -451,9 +459,9 @@ export default async function HomePage() {
               as="li"
               key={step.title}
               delay={index * 100}
-              className="relative rounded-2xl border border-line bg-surface p-3 text-center sm:p-6 sm:text-left"
+              className="relative rounded-2xl border border-line bg-card p-3 shadow-soft text-center sm:p-6 sm:text-left"
             >
-              <span className="font-display text-4xl leading-none text-brand sm:text-6xl">{index + 1}</span>
+              <span className="font-display text-4xl leading-none text-brand-ink sm:text-6xl">{index + 1}</span>
               <h3 className="mt-1 text-xs font-semibold leading-tight sm:mt-3 sm:text-lg">{step.title}</h3>
               <p className="mt-1 hidden text-sm text-muted sm:block">{step.text}</p>
             </Reveal>
@@ -463,7 +471,7 @@ export default async function HomePage() {
 
       {/* 8. Delivery area */}
       <section className="mx-auto max-w-6xl px-4 pb-8 sm:pb-16">
-        <Reveal className="grid gap-4 rounded-3xl border border-line bg-surface p-4 sm:gap-6 sm:rounded-[2rem] sm:p-10 md:grid-cols-[1.2fr_1fr] md:items-center">
+        <Reveal className="grid gap-4 rounded-3xl border border-line bg-card p-4 shadow-soft sm:gap-6 sm:rounded-[2rem] sm:p-10 md:grid-cols-[1.2fr_1fr] md:items-center">
           <div>
             <SectionHeading eyebrow="Where we deliver" title="Delivery Area">
               We deliver only inside Bashundhara R/A so every order arrives hot.
@@ -472,25 +480,25 @@ export default async function HomePage() {
               {DELIVERY_ZONES.map((zone) => (
                 <li
                   key={zone}
-                  className="flex items-center gap-1 whitespace-nowrap rounded-full border border-line bg-ink px-2.5 py-1 text-xs font-semibold sm:gap-1.5 sm:px-4 sm:py-2 sm:text-sm"
+                  className="flex items-center gap-1 whitespace-nowrap rounded-full border border-line bg-alt px-2.5 py-1 text-xs font-semibold sm:gap-1.5 sm:px-4 sm:py-2 sm:text-sm"
                 >
-                  <PinIcon width={14} height={14} className="shrink-0 text-brand" /> {zone}
+                  <PinIcon width={14} height={14} className="shrink-0 text-brand-ink" /> {zone}
                 </li>
               ))}
             </ul>
           </div>
 
           <dl className="grid grid-cols-2 gap-2.5 sm:gap-3">
-            <div className="rounded-2xl bg-ink p-3 sm:p-5">
-              <dt className="text-xs text-muted sm:text-sm">Open</dt>
-              <dd className="mt-0.5 whitespace-nowrap font-display text-2xl tracking-wide text-highlight sm:mt-1 sm:text-3xl">
-                Till 4 AM
+            <div className="rounded-2xl bg-alt p-3 sm:p-5">
+              <dt className="text-xs text-muted sm:text-sm">Hours</dt>
+              <dd className="mt-0.5 font-display text-2xl leading-tight tracking-wide text-highlight-ink sm:mt-1 sm:text-3xl">
+                {settings.hoursText}
               </dd>
             </div>
-            <div className="rounded-2xl bg-ink p-3 sm:p-5">
+            <div className="rounded-2xl bg-alt p-3 sm:p-5">
               <dt className="text-xs text-muted sm:text-sm">Delivery</dt>
-              <dd className="mt-0.5 whitespace-nowrap font-display text-2xl tracking-wide text-highlight sm:mt-1 sm:text-3xl">
-                {formatPrice(DELIVERY_FEE)}
+              <dd className="mt-0.5 whitespace-nowrap font-display text-2xl tracking-wide text-highlight-ink sm:mt-1 sm:text-3xl">
+                {feeLabel(settings.deliveryFee)}
               </dd>
             </div>
           </dl>
@@ -499,16 +507,16 @@ export default async function HomePage() {
 
       {/* 9. Reviews: hidden entirely when there are none */}
       {reviews.length > 0 && (
-        <section className="border-y border-line bg-surface">
+        <section className="border-y border-line bg-alt">
           <div className="mx-auto max-w-6xl px-4 py-8 sm:py-16">
             <Reveal>
               <SectionHeading eyebrow="Straight from Bashundhara" title="What People Say" />
             </Reveal>
             <ul className="mt-5 grid grid-cols-1 gap-3 sm:mt-8 sm:gap-4 md:grid-cols-3">
               {reviews.map((review, index) => (
-                <Reveal as="li" key={review.id} delay={index * 80} className="flex flex-col rounded-2xl border border-line bg-ink p-4 sm:p-6">
+                <Reveal as="li" key={review.id} delay={index * 80} className="flex flex-col rounded-2xl border border-line bg-card p-4 shadow-soft sm:p-6">
                   <Stars rating={review.rating} />
-                  <blockquote className="mt-3 flex-1 text-sm text-cream/90 sm:mt-4 sm:text-base">“{review.text}”</blockquote>
+                  <blockquote className="mt-3 flex-1 text-sm text-fg/90 sm:mt-4 sm:text-base">“{review.text}”</blockquote>
                   <div className="mt-3 flex items-center gap-3 sm:mt-5">
                     {review.image && (
                       // Uploaded to Supabase Storage; any host, so a plain img.
@@ -539,14 +547,14 @@ export default async function HomePage() {
         <Reveal>
           <SectionHeading eyebrow="Good to know" title="FAQ" />
         </Reveal>
-        <Reveal className="mt-5 divide-y divide-line rounded-2xl border border-line bg-surface sm:mt-8">
+        <Reveal className="mt-5 divide-y divide-line rounded-2xl border border-line bg-card shadow-soft sm:mt-8">
           {faqs.map((faq) => (
             <details key={faq.q} className="group px-4 sm:px-5">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-4 text-sm font-semibold sm:gap-4 sm:py-5 sm:text-base [&::-webkit-details-marker]:hidden">
                 {faq.q}
                 <span
                   aria-hidden="true"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-brand transition-transform group-open:rotate-45"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-alt text-brand-ink transition-transform group-open:rotate-45"
                 >
                   +
                 </span>

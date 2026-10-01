@@ -11,8 +11,8 @@ import type { ActionResult } from "@/lib/action-result";
 import {
   BD_PHONE_PATTERN,
   BKASH_TRX_ID_PATTERN,
-  DELIVERY_FEE,
   generateOrderCode,
+  getBkashNumber,
   normalizeBdPhone,
 } from "@/lib/order-config";
 import {
@@ -21,6 +21,8 @@ import {
   sumQuantities,
 } from "@/lib/order-status";
 import { notifyNewOrder, syncOrderMessage } from "@/lib/order-telegram";
+import { readSiteSettings } from "@/lib/settings";
+import { isStoreOpen } from "@/lib/store-hours";
 import type { CreateOrderInput, OrderWithDetails } from "@/types/order";
 
 function isUniqueViolation(error: unknown, field: string) {
@@ -35,6 +37,14 @@ export async function createOrder(
   input: CreateOrderInput
 ): Promise<ActionResult<OrderWithDetails>> {
   try {
+    // Read fresh (not cached): the store may have just been closed, and the
+    // fee saved on the order must be the current one.
+    const settings = await readSiteSettings();
+
+    if (!isStoreOpen(settings)) {
+      throw new ActionError(settings.closedMessage);
+    }
+
     const { customerName, address, note, items } = input ?? {};
     const phone = normalizeBdPhone(input?.phone ?? "");
     const paymentMethod = input?.paymentMethod ?? PaymentMethod.CASH;
@@ -69,6 +79,10 @@ export async function createOrder(
     let senderNumber: string | null = null;
 
     if (paymentMethod === PaymentMethod.BKASH) {
+      if (!getBkashNumber()) {
+        throw new ActionError("bKash payment is not available right now. Please choose Cash on Delivery.");
+      }
+
       trxId = input.trxId?.trim().toUpperCase() || null;
       senderNumber = normalizeBdPhone(input.senderNumber ?? "") || null;
 
@@ -129,7 +143,7 @@ export async function createOrder(
       return { menuItemId: item.menuItemId, quantity: item.quantity, price };
     });
 
-    const deliveryFee = DELIVERY_FEE;
+    const deliveryFee = settings.deliveryFee;
     const totalAmount = subtotal + deliveryFee;
 
     // Retry on the rare order code collision.
@@ -192,29 +206,6 @@ export async function getOrders(): Promise<ActionResult<OrderWithDetails[]>> {
     return { success: true, data: orders };
   } catch (error) {
     return toErrorResult(error, "Failed to fetch orders");
-  }
-}
-
-export async function trackOrder(
-  orderCode: string
-): Promise<ActionResult<OrderWithDetails>> {
-  try {
-    if (!orderCode?.trim()) {
-      throw new ActionError("Order code is required");
-    }
-
-    const order = await prisma.order.findUnique({
-      where: { orderCode: orderCode.trim().toUpperCase() },
-      include: orderInclude,
-    });
-
-    if (!order) {
-      throw new ActionError("Order not found");
-    }
-
-    return { success: true, data: order };
-  } catch (error) {
-    return toErrorResult(error, "Order tracking failed");
   }
 }
 

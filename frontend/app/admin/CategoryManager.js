@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { createCategory, updateCategory } from "@/app/actions/menu";
-import { CATEGORY_IMAGE_FOLDER, categoryImage, categoryShortName } from "@/lib/categories";
-import { uploadPublicImage } from "@/lib/storage";
+import { categoryImage, categoryShortName } from "@/lib/categories";
+import { IMAGE_FOLDERS } from "@/lib/storage-paths";
+import ImageUpload from "./ImageUpload";
 import { FoodIcon } from "@/app/components/icons";
 
 const inputClass =
@@ -47,24 +48,6 @@ function CategoryRow({ category, onChanged, onFailure }) {
       }
       onChanged();
       return true;
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleUpload = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    setBusy(true);
-    try {
-      const { url, error } = await uploadPublicImage(file, CATEGORY_IMAGE_FOLDER);
-      if (error) {
-        alert(error);
-        return;
-      }
-      await save({ image: url });
     } finally {
       setBusy(false);
     }
@@ -119,25 +102,18 @@ function CategoryRow({ category, onChanged, onFailure }) {
             </label>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <label className="cursor-pointer rounded-lg bg-white px-3 py-2 font-semibold text-gray-800 ring-1 ring-gray-300 hover:bg-gray-100">
-              {category.image ? "Replace image" : "Upload image"}
-              <input type="file" accept="image/*" onChange={handleUpload} disabled={busy} className="sr-only" />
-            </label>
-            {category.image && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  if (confirm(`Remove the image for ${category.name}?`)) save({ image: null });
-                }}
-                className="rounded-lg px-3 py-2 font-semibold text-red-600 hover:bg-red-50"
-              >
-                Remove image
-              </button>
-            )}
-            {busy && <span className="text-gray-500">Saving…</span>}
+          <div className="max-w-56">
+            <ImageUpload
+              label="Category image"
+              aspect="aspect-square"
+              folder={IMAGE_FOLDERS.categories}
+              value={category.image ?? ""}
+              savesImmediately
+              disabled={busy}
+              onChange={(url) => save({ image: url })}
+            />
           </div>
+          {busy && <p className="text-xs text-gray-500">Saving…</p>}
           {!category.image && (
             <p className="text-xs text-gray-500">
               No image: the site uses the first menu item photo, or an icon if there is none.
@@ -223,7 +199,7 @@ export default function CategoryManager({ categories, onChanged, onFailure }) {
         <ul className="space-y-2">
           {categories.map((category) => (
             <CategoryRow
-              key={`${category.id}:${category.name}:${category.shortName}:${category.image}`}
+              key={category.id}
               category={category}
               onChanged={onChanged}
               onFailure={onFailure}

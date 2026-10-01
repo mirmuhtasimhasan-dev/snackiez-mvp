@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -10,8 +10,9 @@ import {
   toggleReviewVisibility,
   updateReview,
 } from "@/app/actions/reviews";
-import { REVIEW_IMAGE_FOLDER, REVIEW_SOURCES } from "@/lib/reviews";
-import { uploadPublicImage } from "@/lib/storage";
+import { REVIEW_SOURCES } from "@/lib/reviews";
+import { IMAGE_FOLDERS } from "@/lib/storage-paths";
+import ImageUpload from "../ImageUpload";
 
 const emptyForm = {
   name: "",
@@ -37,7 +38,6 @@ function Stars({ rating }) {
 
 export default function AdminReviewsPage() {
   const router = useRouter();
-  const fileInputRef = useRef(null);
 
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -45,7 +45,6 @@ export default function AdminReviewsPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [busyId, setBusyId] = useState("");
 
   const handleFailure = (result, fallbackMessage) => {
@@ -97,7 +96,6 @@ export default function AdminReviewsPage() {
   const resetForm = () => {
     setEditingId("");
     setForm(emptyForm);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleEdit = (review) => {
@@ -112,27 +110,6 @@ export default function AdminReviewsPage() {
       isVisible: review.isVisible,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-
-    try {
-      const { url, error } = await uploadPublicImage(file, REVIEW_IMAGE_FOLDER);
-
-      if (error) {
-        alert(error);
-        event.target.value = "";
-        return;
-      }
-
-      setForm((prev) => ({ ...prev, image: url }));
-    } finally {
-      setUploading(false);
-    }
   };
 
   const handleSubmit = async (event) => {
@@ -307,38 +284,16 @@ export default function AdminReviewsPage() {
             />
           </div>
 
-          <div className="md:col-span-2">
-            <label htmlFor="imageFile" className="mb-2 block font-semibold text-gray-700">
-              Image (optional screenshot or avatar)
-            </label>
-            <div className="flex flex-wrap items-center gap-4">
-              {form.image && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={form.image} alt="" className="h-16 w-16 rounded-xl border object-cover" />
-              )}
-              <input
-                ref={fileInputRef}
-                id="imageFile"
-                type="file"
-                accept="image/*"
-                onChange={handleUpload}
-                disabled={uploading}
-                className="text-sm"
-              />
-              {uploading && <span className="text-sm text-gray-600">Uploading…</span>}
-              {form.image && !uploading && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForm((prev) => ({ ...prev, image: "" }));
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                  className="text-sm font-semibold text-red-600"
-                >
-                  Remove image
-                </button>
-              )}
-            </div>
+          <div className="md:col-span-2 max-w-64">
+            {/* Remounts per review so its unsaved-upload tracking starts fresh. */}
+            <ImageUpload
+              key={editingId || "new"}
+              label="Image (optional screenshot or avatar)"
+              aspect="aspect-square"
+              folder={IMAGE_FOLDERS.reviews}
+              value={form.image}
+              onChange={(url) => setForm((prev) => ({ ...prev, image: url ?? "" }))}
+            />
           </div>
 
           <div className="flex items-center gap-3 md:col-span-2">
@@ -358,7 +313,7 @@ export default function AdminReviewsPage() {
           <div className="flex gap-4 md:col-span-2">
             <button
               type="submit"
-              disabled={saving || uploading}
+              disabled={saving}
               className="w-full rounded-xl bg-orange-500 py-3 font-bold text-white disabled:opacity-60"
             >
               {saving ? "Saving…" : editingId ? "Update review" : "Add review"}

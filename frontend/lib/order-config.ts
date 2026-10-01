@@ -1,6 +1,3 @@
-// Flat delivery fee (TK) added to every order: total = subtotal + DELIVERY_FEE.
-export const DELIVERY_FEE = 60;
-
 export const ORDER_CODE_PREFIX = "BZ-";
 
 export function generateOrderCode() {
@@ -18,3 +15,13 @@ export function normalizeBdPhone(value: string) {
 }
 
 export const BKASH_TRX_ID_PATTERN = /^[A-Z0-9]{6,20}$/;
+
+/**
+ * The merchant bKash number from BKASH_NUMBER, or null when it is unset or
+ * not a valid Bangladeshi mobile number (e.g. a leftover placeholder). bKash
+ * checkout is turned off when this is null. Server-side only.
+ */
+export function getBkashNumber() {
+  const number = normalizeBdPhone(process.env.BKASH_NUMBER ?? "");
+  return BD_PHONE_PATTERN.test(number) ? number : null;
+}

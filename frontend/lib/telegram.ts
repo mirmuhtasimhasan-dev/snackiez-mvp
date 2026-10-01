@@ -4,7 +4,11 @@
 export type InlineButton = { text: string; callback_data: string } | { text: string; url: string };
 export type InlineKeyboard = InlineButton[][];
 
-type SendOptions = { replyMarkup?: InlineKeyboard };
+type SendOptions = {
+  replyMarkup?: InlineKeyboard;
+  // Reply somewhere other than the orders group (e.g. the chat a command came from).
+  chatId?: string | number;
+};
 
 const API_TIMEOUT_MS = 8000;
 
@@ -64,7 +68,7 @@ function markup(replyMarkup?: InlineKeyboard) {
 export async function sendMessage(text: string, options: SendOptions = {}) {
   const settings = config();
   const result = await callApi<{ message_id: number }>("sendMessage", {
-    chat_id: settings?.chatId,
+    chat_id: options.chatId ?? settings?.chatId,
     text,
     parse_mode: "HTML",
     link_preview_options: { is_disabled: true },

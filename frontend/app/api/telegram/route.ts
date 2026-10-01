@@ -1,18 +1,27 @@
 import { timingSafeEqual } from "node:crypto";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { ActionError } from "@/lib/action-result";
 import { changeOrderStatus } from "@/lib/order-status";
 import { decodeStatusAction, statusLabel, syncOrderMessage } from "@/lib/order-telegram";
-import { answerCallbackQuery } from "@/lib/telegram";
+import { SETTINGS_TAG } from "@/lib/settings";
+import { parseStoreCommand, runStoreCommand } from "@/lib/store-telegram";
+import { answerCallbackQuery, sendMessage } from "@/lib/telegram";
 
-// Telegram calls this for button presses on order messages. Register it with
-// setWebhook, passing TELEGRAM_WEBHOOK_SECRET as secret_token (the command
-// is in .env.example).
+// Telegram calls this for button presses on order messages and for the
+// /open, /close and /status commands. Register it with setWebhook, passing
+// TELEGRAM_WEBHOOK_SECRET as secret_token and allowing both "callback_query"
+// and "message" updates (the command is in .env.example).
 
 type CallbackQuery = {
   id: string;
   data?: string;
   from: { id: number; first_name?: string; last_name?: string; username?: string };
+};
+
+type Message = {
+  text?: string;
+  chat: { id: number };
+  from?: { id: number };
 };
 
 function isAuthentic(request: Request) {
@@ -50,14 +59,21 @@ export async function POST(request: Request) {
 
   const update = (await request.json().catch(() => null)) as {
     callback_query?: CallbackQuery;
+    message?: Message;
   } | null;
+  const adminId = process.env.TELEGRAM_ADMIN_ID;
+
+  if (update?.message) {
+    await handleStoreCommand(update.message, adminId);
+    return ok();
+  }
+
   const query = update?.callback_query;
 
   if (!query) {
     return ok();
   }
 
-  const adminId = process.env.TELEGRAM_ADMIN_ID;
   if (!adminId || String(query.from.id) !== adminId.trim()) {
     await answerCallbackQuery(query.id, "Only admin can do this", true);
     return ok();
@@ -93,4 +109,36 @@ export async function POST(request: Request) {
   }
 
   return ok();
+}
+
+// /open, /close and /status. Only answered in the orders group or the
+// admin's own chat, and only the admin may use them.
+async function handleStoreCommand(message: Message, adminId: string | undefined) {
+  const command = parseStoreCommand(message.text);
+  if (!command) return;
+
+  const chatId = String(message.chat.id);
+  const allowedChats = [process.env.TELEGRAM_CHAT_ID?.trim(), adminId?.trim()].filter(Boolean);
+  if (!allowedChats.includes(chatId)) return;
+
+  if (!adminId || String(message.from?.id) !== adminId.trim()) {
+    await sendMessage("Only admin can do this", { chatId });
+    return;
+  }
+
+  try {
+    const { changed, reply } = await runStoreCommand(command);
+
+    if (changed) {
+      // A webhook cannot use updateTag, so expire the cached settings now:
+      // the next page view must show the new open/closed state.
+      revalidateTag(SETTINGS_TAG, { expire: 0 });
+      revalidatePath("/", "layout");
+    }
+
+    await sendMessage(reply, { chatId });
+  } catch (error) {
+    console.error("[telegram] store command failed:", error);
+    await sendMessage("Something went wrong. Try the admin panel.", { chatId });
+  }
 }

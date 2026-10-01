@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import { getBkashNumber } from "@/lib/order-config";
 import CheckoutForm from "./CheckoutForm";
 
 export const metadata = {
@@ -8,7 +9,7 @@ export const metadata = {
 export default async function CheckoutPage() {
   // Read BKASH_NUMBER per request so changing it doesn't need a rebuild.
   await connection();
-  const bkashNumber = process.env.BKASH_NUMBER || null;
+  const bkashNumber = getBkashNumber();
 
   return (
     <main className="mx-auto max-w-5xl px-4 pb-16 pt-8">

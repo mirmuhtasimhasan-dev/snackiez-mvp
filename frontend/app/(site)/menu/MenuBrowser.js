@@ -17,7 +17,7 @@ export default function MenuBrowser({ categories, initialCategoryId = ALL }) {
 
   return (
     <>
-      <div className="sticky top-16 z-30 -mx-4 mt-5 border-b border-line bg-ink/90 px-4 backdrop-blur-md">
+      <div className="sticky top-16 z-30 -mx-4 mt-5 border-b border-line bg-card/90 px-4 backdrop-blur-md">
         <div
           role="tablist"
           aria-label="Menu categories"
@@ -38,7 +38,7 @@ export default function MenuBrowser({ categories, initialCategoryId = ALL }) {
               >
                 {tab.id === ALL ? (
                   <span
-                    className={`flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-highlight ring-2 ring-offset-2 ring-offset-ink transition sm:h-14 sm:w-14 ${
+                    className={`flex h-12 w-12 items-center justify-center rounded-full bg-alt text-highlight-ink ring-2 ring-offset-2 ring-offset-page transition sm:h-14 sm:w-14 ${
                       selected ? "ring-brand" : "ring-line group-hover:ring-brand/60"
                     }`}
                   >
@@ -54,7 +54,7 @@ export default function MenuBrowser({ categories, initialCategoryId = ALL }) {
                 )}
                 <span
                   className={`w-full truncate text-center text-[11px] font-semibold sm:text-xs ${
-                    selected ? "text-brand" : "text-cream/80 group-hover:text-cream"
+                    selected ? "text-brand-ink" : "text-fg/80 group-hover:text-fg"
                   }`}
                 >
                   {tab.shortName}
@@ -70,7 +70,7 @@ export default function MenuBrowser({ categories, initialCategoryId = ALL }) {
           <section key={category.id} aria-labelledby={`cat-${category.id}`}>
             <h2
               id={`cat-${category.id}`}
-              className="font-display text-3xl tracking-wide text-brand"
+              className="font-display text-3xl tracking-wide text-brand-ink"
             >
               {category.name}
             </h2>

@@ -5,9 +5,9 @@ import Image from "next/image";
 
 // Warm placeholder gradients; each item gets the same one every time.
 const PLACEHOLDERS = [
-  "from-[#5a2a0c] via-[#2a1a10] to-[#1c1612]",
-  "from-[#6b3a08] via-[#2e1f12] to-[#1c1612]",
-  "from-[#4a1f14] via-[#2a1712] to-[#1c1612]",
+  "from-[#ffe3c4] via-[#ffd2a1] to-[#ffb877]",
+  "from-[#fff0c7] via-[#ffd98a] to-[#ffbf5c]",
+  "from-[#ffe0d0] via-[#ffc4a3] to-[#ff9f6e]",
 ];
 
 function pickPlaceholder(name = "") {
@@ -33,11 +33,11 @@ export default function ItemImage({ src, alt, name, sizes, className = "" }) {
       >
         <div
           aria-hidden="true"
-          className="absolute -right-6 -top-6 h-2/3 w-2/3 rounded-full bg-brand/20 blur-2xl"
+          className="absolute -right-6 -top-6 h-2/3 w-2/3 rounded-full bg-card/50 blur-2xl"
         />
         <span
           aria-hidden="true"
-          className="relative font-display text-[clamp(2.25rem,12vw,4rem)] leading-none text-highlight/90 drop-shadow-[0_4px_16px_rgba(255,107,0,0.45)]"
+          className="relative font-display text-[clamp(2.25rem,12vw,4rem)] leading-none text-brand-ink/85 drop-shadow-[0_2px_8px_rgba(255,255,255,0.6)]"
         >
           {label.trim().charAt(0).toUpperCase() || "B"}
         </span>
@@ -46,7 +46,7 @@ export default function ItemImage({ src, alt, name, sizes, className = "" }) {
   }
 
   return (
-    <div className={`relative overflow-hidden bg-surface-2 ${className}`}>
+    <div className={`relative overflow-hidden bg-alt ${className}`}>
       <Image
         src={src}
         alt={alt}

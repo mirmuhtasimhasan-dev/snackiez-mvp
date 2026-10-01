@@ -1,12 +1,19 @@
-export const WHATSAPP_NUMBER = "01816453795";
-export const FACEBOOK_URL = "https://facebook.com/bitezzbd";
-export const HOURS = "Open till 4 AM";
+// Contact details, hours and the delivery fee come from SiteSettings (admin
+// Settings page). Only things that never change live here.
 export const AREA = "Bashundhara R/A, Dhaka";
 export const DELIVERY_ZONES = ["Bashundhara R/A", "NSU", "IUB", "NISS"];
 
-export function whatsappLink(message) {
-  const url = `https://wa.me/88${WHATSAPP_NUMBER}`;
+/** wa.me link for a local BD number like 01816453795, or null without one. */
+export function whatsappLink(number, message) {
+  if (!number) return null;
+
+  const url = `https://wa.me/88${number}`;
   return message ? `${url}?text=${encodeURIComponent(message)}` : url;
+}
+
+/** tel: link for a local BD number, or null without one. */
+export function telLink(number) {
+  return number ? `tel:+88${number}` : null;
 }
 
 export function formatPrice(amount) {

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useCart } from "./CartProvider";
+import { useStore } from "./StoreProvider";
 import ItemImage from "./ItemImage";
 import { BagIcon, CloseIcon, MinusIcon, PlusIcon, TrashIcon } from "./icons";
 import { formatPrice } from "@/lib/site";
@@ -19,6 +20,7 @@ export default function CartDrawer() {
     removeItem,
     canIncrease,
   } = useCart();
+  const { settings, open, opensAt } = useStore();
   const closeButtonRef = useRef(null);
 
   useEffect(() => {
@@ -54,8 +56,9 @@ export default function CartDrawer() {
         aria-modal="true"
         aria-labelledby="cart-title"
         inert={!isOpen}
-        className={`absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-line bg-surface shadow-2xl transition-transform duration-300 ease-out ${
-          isOpen ? "translate-x-0" : "translate-x-full"
+        className={`absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-line bg-card transition-[translate,visibility,box-shadow] duration-300 ease-out ${
+          // Shadow only while open: when closed it would leak in from off-screen.
+          isOpen ? "translate-x-0 shadow-2xl" : "invisible translate-x-full shadow-none"
         }`}
       >
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-line px-4">
@@ -66,7 +69,7 @@ export default function CartDrawer() {
             ref={closeButtonRef}
             type="button"
             onClick={closeCart}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-cream/80 hover:bg-white/5 hover:text-cream"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-fg/80 hover:bg-fg/5 hover:text-fg"
             aria-label="Close cart"
           >
             <CloseIcon />
@@ -75,15 +78,15 @@ export default function CartDrawer() {
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/5 text-muted">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-fg/5 text-muted">
               <BagIcon width={28} height={28} />
             </div>
             <p className="text-lg font-semibold">Your cart is empty</p>
-            <p className="text-sm text-muted">Hungry? The kitchen is open till 4 AM.</p>
+            <p className="text-sm text-muted">Hungry? {settings.hoursText}.</p>
             <Link
               href="/menu"
               onClick={closeCart}
-              className="mt-2 rounded-full bg-brand px-6 py-3 font-semibold text-cream hover:bg-brand-hover"
+              className="mt-2 rounded-full bg-brand px-6 py-3 font-semibold text-fg hover:bg-brand-hover"
             >
               Browse Menu
             </Link>
@@ -106,7 +109,7 @@ export default function CartDrawer() {
                       <button
                         type="button"
                         onClick={() => removeItem(item.id)}
-                        className="-mr-2 -mt-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-white/5 hover:text-cream"
+                        className="-mr-2 -mt-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-fg/5 hover:text-fg"
                         aria-label={`Remove ${item.name}`}
                       >
                         <TrashIcon width={16} height={16} />
@@ -118,7 +121,7 @@ export default function CartDrawer() {
                         <button
                           type="button"
                           onClick={() => setQuantity(item.id, item.quantity - 1)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/5"
+                          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-fg/5"
                           aria-label={`Decrease ${item.name}`}
                         >
                           <MinusIcon width={16} height={16} />
@@ -130,7 +133,7 @@ export default function CartDrawer() {
                           type="button"
                           onClick={() => setQuantity(item.id, item.quantity + 1)}
                           disabled={!canIncrease(item)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/5 disabled:opacity-30"
+                          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-fg/5 disabled:opacity-30"
                           aria-label={`Increase ${item.name}`}
                         >
                           <PlusIcon width={16} height={16} />
@@ -148,11 +151,11 @@ export default function CartDrawer() {
 
             <div className="shrink-0 border-t border-line px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
               <dl className="space-y-2 text-sm">
-                <div className="flex justify-between text-cream/80">
+                <div className="flex justify-between text-fg/80">
                   <dt>Subtotal</dt>
                   <dd className="tabular-nums">{formatPrice(subtotal)}</dd>
                 </div>
-                <div className="flex justify-between text-cream/80">
+                <div className="flex justify-between text-fg/80">
                   <dt>Delivery fee</dt>
                   <dd className="tabular-nums">{formatPrice(deliveryFee)}</dd>
                 </div>
@@ -162,13 +165,23 @@ export default function CartDrawer() {
                 </div>
               </dl>
 
-              <Link
-                href="/checkout"
-                onClick={closeCart}
-                className="mt-4 flex h-12 w-full items-center justify-center rounded-full bg-brand font-semibold text-cream hover:bg-brand-hover"
-              >
-                Checkout
-              </Link>
+              {open ? (
+                <Link
+                  href="/checkout"
+                  onClick={closeCart}
+                  className="mt-4 flex h-12 w-full items-center justify-center rounded-full bg-brand font-semibold text-fg hover:bg-brand-hover"
+                >
+                  Checkout
+                </Link>
+              ) : (
+                <p
+                  role="status"
+                  className="mt-4 rounded-2xl bg-alt px-4 py-3 text-center text-sm font-medium text-fg"
+                >
+                  {settings.closedMessage}
+                  {opensAt && <span className="font-semibold"> Opens at {opensAt}.</span>}
+                </p>
+              )}
             </div>
           </>
         )}

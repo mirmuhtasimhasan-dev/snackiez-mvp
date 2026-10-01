@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import type { Review } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { deleteImageIfUnused } from "@/lib/storage-server";
 import { ActionError, toErrorResult } from "@/lib/action-result";
 import type { ActionResult } from "@/lib/action-result";
 import type { ReviewInput } from "@/types/review";
@@ -109,10 +111,17 @@ export async function updateReview(
   try {
     await requireAdmin();
 
+    const previous = await prisma.review.findUnique({ where: { id }, select: { image: true } });
     const review = await prisma.review.update({
       where: { id },
       data: parseReview(input ?? {}, true),
     });
+
+    // Delete a replaced or removed upload once the response is sent.
+    const oldImage = previous?.image;
+    if (input?.image !== undefined && oldImage && oldImage !== review.image) {
+      after(() => deleteImageIfUnused(oldImage));
+    }
 
     revalidateReviews();
     return { success: true, message: "Review updated", data: review };
@@ -149,7 +158,8 @@ export async function deleteReview(id: string): Promise<ActionResult> {
   try {
     await requireAdmin();
 
-    await prisma.review.delete({ where: { id } });
+    const deleted = await prisma.review.delete({ where: { id } });
+    if (deleted.image) after(() => deleteImageIfUnused(deleted.image));
 
     revalidateReviews();
     return { success: true, message: "Review deleted", data: null };
