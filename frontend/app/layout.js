@@ -30,17 +30,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html
-      lang="en"
-      className={`${bebas.variable} ${inter.variable}`}
-      suppressHydrationWarning
-    >
-      <head>
-        {/* Lets CSS hide scroll-reveal content only when JS can reveal it. */}
-        <script
-          dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }}
-        />
-      </head>
+    <html lang="en" className={`${bebas.variable} ${inter.variable}`}>
       <body className="bg-ink font-sans text-cream antialiased">
         {children}
       </body>

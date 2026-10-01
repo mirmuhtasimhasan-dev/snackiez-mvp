@@ -110,3 +110,25 @@ export function WhatsAppIcon(props) {
     </svg>
   );
 }
+
+export function FoodIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 11h16a8 8 0 0 0-16 0Z" />
+      <path d="M3 14h18" />
+      <path d="M5 17h14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z" />
+      <path d="M9 7.5h.01M12 6.5h.01M15 7.5h.01" />
+    </svg>
+  );
+}
+
+export function GridIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+    </svg>
+  );
+}

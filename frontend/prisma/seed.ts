@@ -74,10 +74,25 @@ async function seedReviews() {
   console.log(`Seeded ${reviews.length} reviews.`);
 }
 
+// Short labels for the round category icons. Only filled in when empty, so
+// names edited in admin are kept.
+const categoryShortNames: Record<string, string> = {
+  "Shawarma Specials": "Shawarma",
+  "Burger Specials": "Burgers",
+  "Fries Favourites": "Fries",
+  "Wrap Favorites": "Wraps",
+  "Tender Special": "Tenders",
+};
+
 async function main() {
   for (const [categoryName, items] of Object.entries(menu)) {
+    const shortName = categoryShortNames[categoryName] ?? null;
     let category = await prisma.category.findFirst({ where: { name: categoryName } });
-    if (!category) category = await prisma.category.create({ data: { name: categoryName } });
+    if (!category) {
+      category = await prisma.category.create({ data: { name: categoryName, shortName } });
+    } else if (!category.shortName && shortName) {
+      category = await prisma.category.update({ where: { id: category.id }, data: { shortName } });
+    }
 
     for (const item of items) {
       const data = {

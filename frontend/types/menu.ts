@@ -13,3 +13,9 @@ export type MenuItemInput = {
   isFeatured?: boolean;
   stockQty?: number | string;
 };
+
+export type CategoryInput = {
+  name: string;
+  shortName?: string | null;
+  image?: string | null;
+};

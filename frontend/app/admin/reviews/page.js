@@ -10,12 +10,8 @@ import {
   toggleReviewVisibility,
   updateReview,
 } from "@/app/actions/reviews";
-import {
-  MAX_REVIEW_IMAGE_BYTES,
-  REVIEW_IMAGE_FOLDER,
-  REVIEW_SOURCES,
-  STORAGE_BUCKET,
-} from "@/lib/reviews";
+import { REVIEW_IMAGE_FOLDER, REVIEW_SOURCES } from "@/lib/reviews";
+import { uploadPublicImage } from "@/lib/storage";
 
 const emptyForm = {
   name: "",
@@ -122,36 +118,18 @@ export default function AdminReviewsPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      alert("Please choose an image file");
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > MAX_REVIEW_IMAGE_BYTES) {
-      alert("Image must be 5 MB or smaller");
-      event.target.value = "";
-      return;
-    }
-
     setUploading(true);
 
     try {
-      const supabase = createClient();
-      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const path = `${REVIEW_IMAGE_FOLDER}/${crypto.randomUUID()}.${extension}`;
-
-      const { error } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(path, file, { contentType: file.type, upsert: false });
+      const { url, error } = await uploadPublicImage(file, REVIEW_IMAGE_FOLDER);
 
       if (error) {
-        alert(`Upload failed: ${error.message}`);
+        alert(error);
+        event.target.value = "";
         return;
       }
 
-      const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-      setForm((prev) => ({ ...prev, image: data.publicUrl }));
+      setForm((prev) => ({ ...prev, image: url }));
     } finally {
       setUploading(false);
     }

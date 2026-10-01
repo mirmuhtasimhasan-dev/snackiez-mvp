@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { ActionError, toErrorResult } from "@/lib/action-result";
 import type { ActionResult } from "@/lib/action-result";
 import type {
+  CategoryInput,
   CategoryWithItems,
   MenuItemInput,
   MenuItemWithCategory,
@@ -44,18 +45,37 @@ function parsePrice(value: number | string) {
 
 // Categories
 
+function parseCategory(input: Partial<CategoryInput>, partial: boolean) {
+  const data: { name?: string; shortName?: string | null; image?: string | null } = {};
+
+  if (!partial || input.name !== undefined) {
+    if (!input.name?.trim()) throw new ActionError("Category name is required");
+    data.name = input.name.trim();
+  }
+
+  if (input.shortName !== undefined) {
+    const shortName = input.shortName?.trim() || null;
+    if (shortName && shortName.length > 16) {
+      throw new ActionError("Short name must be 16 characters or fewer");
+    }
+    data.shortName = shortName;
+  }
+
+  if (input.image !== undefined) {
+    data.image = input.image?.trim() || null;
+  }
+
+  return data;
+}
+
 export async function createCategory(
-  name: string
+  input: CategoryInput
 ): Promise<ActionResult<Category>> {
   try {
     await requireAdmin();
 
-    if (!name?.trim()) {
-      throw new ActionError("Category name is required");
-    }
-
     const category = await prisma.category.create({
-      data: { name: name.trim() },
+      data: parseCategory(input ?? {}, false) as { name: string },
     });
 
     revalidateMenu();
@@ -80,18 +100,14 @@ export async function getCategories(): Promise<ActionResult<CategoryWithItems[]>
 
 export async function updateCategory(
   id: string,
-  name: string
+  input: Partial<CategoryInput>
 ): Promise<ActionResult<Category>> {
   try {
     await requireAdmin();
 
-    if (!name?.trim()) {
-      throw new ActionError("Category name is required");
-    }
-
     const category = await prisma.category.update({
       where: { id },
-      data: { name: name.trim() },
+      data: parseCategory(input ?? {}, true),
     });
 
     revalidateMenu();

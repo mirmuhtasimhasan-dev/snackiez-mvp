@@ -11,6 +11,9 @@ datasource db {
 model Category {
   id        String     @id @default(uuid())
   name      String
+  // Short label for round category icons, e.g. "Burgers" for "Burger Specials".
+  shortName String?
+  image     String?
   menuItems MenuItem[]
   createdAt DateTime   @default(now())
 }

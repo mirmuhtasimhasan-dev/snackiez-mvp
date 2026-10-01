@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { categoryImage, categoryShortName } from "@/lib/categories";
 import MenuBrowser from "./MenuBrowser";
 
 export const metadata = {
@@ -34,6 +35,8 @@ export default async function MenuPage({ searchParams }) {
     .map((category) => ({
       id: category.id,
       name: category.name,
+      shortName: categoryShortName(category),
+      image: categoryImage(category),
       items: category.menuItems,
     }));
 

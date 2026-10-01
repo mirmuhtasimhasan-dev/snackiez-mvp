@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
-  createCategory,
   createMenuItem,
   deleteMenuItem,
   getCategories,
@@ -15,6 +14,7 @@ import {
   updateMenuItem,
 } from "@/app/actions/menu";
 import { getOrders, updateOrderStatus } from "@/app/actions/orders";
+import CategoryManager from "./CategoryManager";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -26,7 +26,6 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
 
-  const [categoryName, setCategoryName] = useState("");
   const [editingItemId, setEditingItemId] = useState("");
   const [updatingOrderId, setUpdatingOrderId] = useState("");
 
@@ -104,26 +103,6 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     await createClient().auth.signOut();
     router.push("/admin/login");
-  };
-
-  const handleCreateCategory = async (e) => {
-    e.preventDefault();
-
-    if (!categoryName.trim()) {
-      alert("Please enter category name");
-      return;
-    }
-
-    const result = await createCategory(categoryName.trim());
-
-    if (!result.success) {
-      handleFailure(result, "Category creation failed");
-      return;
-    }
-
-    setCategoryName("");
-    fetchDashboardData();
-    alert("Category created successfully");
   };
 
   const handleItemFormChange = (e) => {
@@ -391,53 +370,11 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-          <div className="bg-white rounded-2xl shadow-md p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-5">
-              Add Category
-            </h2>
-
-            <form onSubmit={handleCreateCategory}>
-              <input
-                type="text"
-                value={categoryName}
-                onChange={(e) => setCategoryName(e.target.value)}
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 outline-none focus:border-orange-500"
-                placeholder="Example: Burger"
-              />
-
-              <button
-                type="submit"
-                className="w-full mt-4 bg-orange-500 text-white py-3 rounded-xl font-bold"
-              >
-                Add Category
-              </button>
-            </form>
-
-            <div className="mt-6">
-              <h3 className="font-bold text-gray-900 mb-3">Categories</h3>
-
-              {categories.length === 0 ? (
-                <p className="text-gray-600">No categories found.</p>
-              ) : (
-                <div className="space-y-2">
-                  {categories.map((category) => (
-                    <div
-                      key={category.id}
-                      className="bg-gray-50 px-4 py-3 rounded-xl flex items-center justify-between"
-                    >
-                      <span className="font-semibold text-gray-900">
-                        {category.name}
-                      </span>
-
-                      <span className="text-sm text-gray-500">
-                        {category.menuItems?.length || 0} items
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <CategoryManager
+            categories={categories}
+            onChanged={fetchDashboardData}
+            onFailure={handleFailure}
+          />
 
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-md p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-5">

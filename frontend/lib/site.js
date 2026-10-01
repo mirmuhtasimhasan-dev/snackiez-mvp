@@ -12,3 +12,8 @@ export function whatsappLink(message) {
 export function formatPrice(amount) {
   return `TK ${Number(amount).toLocaleString("en-US")}`;
 }
+
+// Compact price for menu cards, e.g. "৳249". Never breaks across lines.
+export function formatPriceShort(amount) {
+  return `৳${Number(amount).toLocaleString("en-US")}`;
+}

@@ -30,10 +30,10 @@ body {
   outline-offset: 2px;
 }
 
-/* Fade-up on scroll. Only hides content once JS has marked <html> and the
-   visitor has not asked for reduced motion, so content is never lost. */
+/* Fade-up on scroll. Reveal.js adds .reveal-pending only to elements that
+   start below the fold, and never for reduced-motion visitors. */
 @media (prefers-reduced-motion: no-preference) {
-  html.js .reveal {
+  .reveal-pending {
     opacity: 0;
     transform: translateY(24px);
     transition:
@@ -42,7 +42,7 @@ body {
     transition-delay: var(--reveal-delay, 0ms);
   }
 
-  html.js .reveal.is-visible {
+  .reveal-pending.is-visible {
     opacity: 1;
     transform: none;
   }
