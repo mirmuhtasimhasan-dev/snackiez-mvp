@@ -9,6 +9,7 @@ import { getSiteSettings } from "@/lib/settings";
 import { DELIVERY_ZONES, formatPrice, whatsappLink } from "@/lib/site";
 import AddToCartButton from "@/app/components/AddToCartButton";
 import CategoryCircle from "@/app/components/CategoryCircle";
+import CreatorVideos from "@/app/components/CreatorVideos";
 import FallbackImage from "@/app/components/FallbackImage";
 import MenuCard from "@/app/components/MenuCard";
 import Reveal from "@/app/components/Reveal";
@@ -44,7 +45,7 @@ function buildInfo(settings) {
   return [
     { icon: MoonIcon, title: "Late Night Delivery", detail: "Cravings after midnight? We got you." },
     { icon: ClockIcon, title: settings.hoursText, detail: "Hot food, every night." },
-    { icon: PinIcon, title: "Bashundhara R/A only", detail: "NSU, IUB, NISS and around" },
+    { icon: PinIcon, title: "Bashundhara R/A only", detail: "NSU, IUB and around" },
     { icon: CashIcon, title: "Cash on Delivery", detail: "Or pay with bKash" },
     settings.whatsappNumber && {
       icon: WhatsAppIcon,
@@ -169,7 +170,7 @@ async function getHomeData() {
     select: menuCardSelect,
   });
 
-  const [bestSellers, categories, newItem, reviews] = await Promise.all([
+  const [bestSellers, categories, newItem, reviews, creatorVideos] = await Promise.all([
     featured.length > 0
       ? featured
       : prisma.menuItem.findMany({ orderBy: { createdAt: "asc" }, take: 4, select: menuCardSelect }),
@@ -195,18 +196,23 @@ async function getHomeData() {
       select: { ...menuCardSelect, category: { select: { name: true } } },
     }),
     prisma.review.findMany({
+      where: { isVisible: true, status: "APPROVED" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.creatorVideo.findMany({
       where: { isVisible: true },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true, creatorName: true, handle: true, instagramUrl: true, videoUrl: true, posterUrl: true },
     }),
   ]);
 
-  return { bestSellers, categories, newItem, reviews };
+  return { bestSellers, categories, newItem, reviews, creatorVideos };
 }
 
 export default async function HomePage() {
   // Best sellers show live stock, so render per request.
   await connection();
-  const { bestSellers, categories, newItem, reviews } = await getHomeData();
+  const { bestSellers, categories, newItem, reviews, creatorVideos } = await getHomeData();
   const settings = await getSiteSettings();
   const info = buildInfo(settings);
   const faqs = buildFaqs(settings);
@@ -477,7 +483,7 @@ export default async function HomePage() {
               We deliver only inside Bashundhara R/A so every order arrives hot.
             </SectionHeading>
             <ul className="mt-3 flex flex-wrap gap-1.5 sm:mt-6 sm:gap-2">
-              {DELIVERY_ZONES.map((zone) => (
+              {DELIVERY_ZONES.filter((zone) => zone !== "NISS").map((zone) => (
                 <li
                   key={zone}
                   className="flex items-center gap-1 whitespace-nowrap rounded-full border border-line bg-alt px-2.5 py-1 text-xs font-semibold sm:gap-1.5 sm:px-4 sm:py-2 sm:text-sm"
@@ -505,6 +511,16 @@ export default async function HomePage() {
         </Reveal>
       </section>
 
+      {/* Loved by Creators: hidden entirely when no video is visible */}
+      {creatorVideos.length > 0 && (
+        <section className="mx-auto max-w-6xl px-4 pb-8 sm:pb-16">
+          <Reveal>
+            <SectionHeading eyebrow="As seen on Instagram" title="Loved by Creators" />
+          </Reveal>
+          <CreatorVideos videos={creatorVideos} />
+        </section>
+      )}
+
       {/* 9. Reviews: hidden entirely when there are none */}
       {reviews.length > 0 && (
         <section className="border-y border-line bg-alt">
@@ -530,8 +546,12 @@ export default async function HomePage() {
                     )}
                     <div>
                       <p className="font-semibold">{review.name}</p>
-                      {review.source && (
-                        <p className="text-xs text-muted">via {review.source}</p>
+                      {review.isVerified ? (
+                        <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+                          <CheckIcon width={12} height={12} strokeWidth={3} /> Verified order
+                        </p>
+                      ) : (
+                        review.source && <p className="text-xs text-muted">via {review.source}</p>
                       )}
                     </div>
                   </div>
@@ -543,7 +563,7 @@ export default async function HomePage() {
       )}
 
       {/* 10. FAQ */}
-      <section className="mx-auto max-w-3xl px-4 py-8 sm:py-16">
+      <section id="faq" className="mx-auto max-w-3xl scroll-mt-20 px-4 py-8 sm:py-16">
         <Reveal>
           <SectionHeading eyebrow="Good to know" title="FAQ" />
         </Reveal>

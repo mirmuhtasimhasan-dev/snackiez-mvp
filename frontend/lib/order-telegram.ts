@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { orderInclude } from "@/lib/order-status";
 import { editMessage, escapeHtml, sendMessage } from "@/lib/telegram";
 import type { InlineKeyboard } from "@/lib/telegram";
+import { reviewPath, reviewRequestMessage, siteBaseUrl } from "@/lib/review-link";
+import { whatsappLink } from "@/lib/site";
 import type { OrderWithDetails } from "@/types/order";
 
 // Order notifications for the kitchen's Telegram group. Everything here is
@@ -84,17 +86,31 @@ function tk(amount: number) {
 
 // Telegram only accepts public https links in buttons.
 function adminUrl() {
-  const base =
-    process.env.SITE_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "");
+  const base = siteBaseUrl();
+  return base ? `${base}/admin` : null;
+}
 
-  return base.startsWith("https://") ? `${base.replace(/\/$/, "")}/admin` : null;
+// wa.me link that opens a chat with the customer, review request pre-filled.
+function reviewRequestUrl(order: OrderWithDetails) {
+  const base = siteBaseUrl();
+  if (!base) return null;
+
+  const message = reviewRequestMessage(
+    order.customer.name,
+    order.orderCode,
+    `${base}${reviewPath(order.orderCode)}`
+  );
+  return whatsappLink(order.customer.phone, message) as string | null;
 }
 
 function buildKeyboard(order: OrderWithDetails): InlineKeyboard {
   const actions = NEXT_ACTIONS[order.status];
+
+  // Delivered: no status buttons left, only the review request link.
+  if (order.status === OrderStatus.DELIVERED) {
+    const reviewUrl = reviewRequestUrl(order);
+    return reviewUrl ? [[{ text: "⭐ Send review link", url: reviewUrl }]] : [];
+  }
 
   if (actions.length === 0) {
     return [];

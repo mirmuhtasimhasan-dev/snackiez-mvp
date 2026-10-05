@@ -7,6 +7,7 @@ import {
   createReview,
   deleteReview,
   getReviews,
+  setReviewStatus,
   toggleReviewVisibility,
   updateReview,
 } from "@/app/actions/reviews";
@@ -46,6 +47,10 @@ export default function AdminReviewsPage() {
   const [editingId, setEditingId] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState("");
+  const [tab, setTab] = useState("pending");
+
+  const pendingCount = reviews.filter((review) => review.status === "PENDING").length;
+  const shownReviews = tab === "pending" ? reviews.filter((review) => review.status === "PENDING") : reviews;
 
   const handleFailure = (result, fallbackMessage) => {
     if (result.unauthorized) {
@@ -154,6 +159,23 @@ export default function AdminReviewsPage() {
 
     try {
       const result = await toggleReviewVisibility(review.id, !review.isVisible);
+
+      if (!result.success) {
+        handleFailure(result, "Failed to update review");
+        return;
+      }
+
+      setReviews((prev) => prev.map((item) => (item.id === review.id ? result.data : item)));
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const handleStatus = async (review, status) => {
+    setBusyId(review.id);
+
+    try {
+      const result = await setReviewStatus(review.id, status);
 
       if (!result.success) {
         handleFailure(result, "Failed to update review");
@@ -331,17 +353,37 @@ export default function AdminReviewsPage() {
         </form>
 
         <section className="mt-8 rounded-2xl bg-white p-6 shadow-md">
-          <h2 className="text-xl font-bold">All reviews</h2>
+          <div role="tablist" aria-label="Reviews" className="flex gap-2">
+            {[
+              { id: "pending", label: `Pending (${pendingCount})` },
+              { id: "all", label: "All reviews" },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.id}
+                onClick={() => setTab(item.id)}
+                className={`rounded-full px-4 py-2 text-sm font-bold ${
+                  tab === item.id ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-700"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
 
           {loading ? (
             <p className="py-8 text-center text-gray-600">Loading reviews…</p>
-          ) : reviews.length === 0 ? (
+          ) : shownReviews.length === 0 ? (
             <p className="py-8 text-center text-gray-600">
-              No reviews yet. The home page reviews section stays hidden until you add one.
+              {tab === "pending"
+                ? "No reviews are waiting for approval."
+                : "No reviews yet. The home page reviews section stays hidden until you add one."}
             </p>
           ) : (
             <ul className="mt-4 divide-y divide-gray-200">
-              {reviews.map((review) => (
+              {shownReviews.map((review) => (
                 <li key={review.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start">
                   <span className="w-10 shrink-0 text-sm font-semibold text-gray-500">
                     #{review.sortOrder}
@@ -368,11 +410,47 @@ export default function AdminReviewsPage() {
                       >
                         {review.isVisible ? "Visible" : "Hidden"}
                       </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          review.status === "APPROVED"
+                            ? "bg-green-100 text-green-700"
+                            : review.status === "PENDING"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {review.status}
+                      </span>
+                      {review.isVerified && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                          Verified order
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-gray-700">{review.text}</p>
                   </div>
 
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {review.status !== "APPROVED" && (
+                      <button
+                        type="button"
+                        onClick={() => handleStatus(review, "APPROVED")}
+                        disabled={busyId === review.id}
+                        className="rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        Approve
+                      </button>
+                    )}
+                    {review.status !== "REJECTED" && (
+                      <button
+                        type="button"
+                        onClick={() => handleStatus(review, "REJECTED")}
+                        disabled={busyId === review.id}
+                        className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        Reject
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleEdit(review)}

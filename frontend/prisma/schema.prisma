@@ -54,6 +54,7 @@ model Order {
   telegramMessageId Int?
   status            OrderStatus @default(PENDING)
   payment           Payment?
+  review            Review?
   createdAt         DateTime    @default(now())
 }
 
@@ -89,15 +90,27 @@ model Banner {
 }
 
 model Review {
-  id        String   @id @default(uuid())
-  name      String
-  text      String
-  rating    Int
-  image     String?
-  source    String?
-  isVisible Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
+  id         String       @id @default(uuid())
+  // Set for reviews left by a customer for a delivered order; null for
+  // reviews added by admin.
+  orderId    String?      @unique
+  order      Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  status     ReviewStatus @default(APPROVED)
+  isVerified Boolean      @default(false)
+  name       String
+  text       String
+  rating     Int
+  image      String?
+  source     String?
+  isVisible  Boolean      @default(true)
+  sortOrder  Int          @default(0)
+  createdAt  DateTime     @default(now())
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum OrderStatus {
@@ -136,4 +149,28 @@ model SiteSettings {
   isOpen         Boolean  @default(true)
   closedMessage  String   @default("We are closed right now. Please order again later.")
   updatedAt      DateTime @updatedAt
+}
+
+// One row per attempt on the public review page, for rate limiting by IP
+// and by order code. Old rows are deleted as new ones arrive.
+model ReviewAttempt {
+  id        String   @id @default(uuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
+
+// Short creator reels shown in "Loved by Creators" on the home page.
+model CreatorVideo {
+  id           String   @id @default(uuid())
+  creatorName  String
+  handle       String?
+  // Link to the original reel on Instagram.
+  instagramUrl String?
+  videoUrl     String
+  posterUrl    String?
+  isVisible    Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
 }

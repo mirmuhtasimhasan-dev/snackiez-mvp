@@ -18,6 +18,8 @@ import CategoryManager from "./CategoryManager";
 import ImageUpload from "./ImageUpload";
 import StoreToggle from "./StoreToggle";
 import { IMAGE_FOLDERS } from "@/lib/storage-paths";
+import { reviewPath, reviewRequestMessage } from "@/lib/review-link";
+import { whatsappLink } from "@/lib/site";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -226,6 +228,13 @@ export default function DashboardPage() {
 
     fetchDashboardData();
     alert("Menu item deleted successfully");
+  };
+
+  // Opens WhatsApp to the customer with the review request and link.
+  const sendReviewLink = (order) => {
+    const link = `${window.location.origin}${reviewPath(order.orderCode)}`;
+    const message = reviewRequestMessage(order.customer.name, order.orderCode, link);
+    window.open(whatsappLink(order.customer.phone, message), "_blank", "noopener");
   };
 
   const handleStatusChange = async (orderId, newStatus) => {
@@ -802,6 +811,16 @@ export default function DashboardPage() {
                     >
                       Receipt
                     </Link>
+
+                    {order.status === "DELIVERED" && (
+                      <button
+                        type="button"
+                        onClick={() => sendReviewLink(order)}
+                        className="bg-green-600 text-white px-4 py-2 rounded-xl font-semibold"
+                      >
+                        Send review link
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

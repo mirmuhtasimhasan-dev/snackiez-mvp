@@ -1,13 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import logo from "@/public/logo.png";
+import { getPendingReviewCount } from "@/app/actions/reviews";
 
 const links = [
   { href: "/admin", label: "Orders & Menu" },
   { href: "/admin/reviews", label: "Reviews" },
+  { href: "/admin/videos", label: "Creator Videos" },
   { href: "/admin/settings", label: "Settings" },
 ];
 
@@ -18,8 +21,23 @@ function isActive(pathname, href) {
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const onLogin = pathname.replace(/\/$/, "") === "/admin/login";
+  const [pendingReviews, setPendingReviews] = useState(0);
 
-  if (pathname.replace(/\/$/, "") === "/admin/login") {
+  // Refreshed on every admin navigation. Signed-out calls return nothing.
+  useEffect(() => {
+    if (onLogin) return;
+
+    let cancelled = false;
+    getPendingReviewCount().then((result) => {
+      if (!cancelled && result.success) setPendingReviews(result.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, onLogin]);
+
+  if (onLogin) {
     return null;
   }
 
@@ -46,6 +64,14 @@ export default function AdminSidebar() {
               }`}
             >
               {link.label}
+              {link.href === "/admin/reviews" && pendingReviews > 0 && (
+                <span
+                  aria-label={`${pendingReviews} pending`}
+                  className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white"
+                >
+                  {pendingReviews}
+                </span>
+              )}
             </Link>
           );
         })}

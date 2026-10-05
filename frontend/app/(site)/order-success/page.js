@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { CheckIcon, WhatsAppIcon } from "@/app/components/icons";
+import { reviewPath } from "@/lib/review-link";
 import { getSiteSettings } from "@/lib/settings";
 import { formatPrice, whatsappLink } from "@/lib/site";
 
@@ -21,6 +22,8 @@ export default async function OrderSuccessPage({ searchParams }) {
         where: { orderCode },
         select: {
           orderCode: true,
+          status: true,
+          review: { select: { id: true } },
           totalAmount: true,
           deliveryFee: true,
           items: {
@@ -112,6 +115,14 @@ export default async function OrderSuccessPage({ searchParams }) {
       </div>
 
       <div className="mt-6 flex flex-col gap-3">
+        {order.status === "DELIVERED" && !order.review && (
+          <Link
+            href={reviewPath(order.orderCode)}
+            className="flex h-13 items-center justify-center rounded-full bg-brand py-3.5 font-semibold text-fg transition hover:bg-brand-hover"
+          >
+            Rate your order
+          </Link>
+        )}
         {whatsappNumber && (
           <a
             href={whatsappLink(whatsappNumber, message)}

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
+import { ReviewStatus } from "@prisma/client";
 import type { Review } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
@@ -14,6 +15,8 @@ import { REVIEW_SOURCES } from "@/lib/reviews";
 function revalidateReviews() {
   revalidatePath("/");
   revalidatePath("/admin/reviews");
+  // The sidebar badge with the pending count sits in the admin layout.
+  revalidatePath("/admin", "layout");
 }
 
 function parseReview(input: Partial<ReviewInput>, partial: boolean) {
@@ -66,7 +69,7 @@ function parseReview(input: Partial<ReviewInput>, partial: boolean) {
 export async function getVisibleReviews(): Promise<ActionResult<Review[]>> {
   try {
     const reviews = await prisma.review.findMany({
-      where: { isVisible: true },
+      where: { isVisible: true, status: ReviewStatus.APPROVED },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
 
@@ -165,5 +168,41 @@ export async function deleteReview(id: string): Promise<ActionResult> {
     return { success: true, message: "Review deleted", data: null };
   } catch (error) {
     return toErrorResult(error, "Review delete failed");
+  }
+}
+
+// Customer reviews arrive as PENDING; only APPROVED ones show on the site.
+export async function setReviewStatus(
+  id: string,
+  status: ReviewStatus
+): Promise<ActionResult<Review>> {
+  try {
+    await requireAdmin();
+
+    if (status !== ReviewStatus.APPROVED && status !== ReviewStatus.REJECTED) {
+      throw new ActionError("A review can only be approved or rejected");
+    }
+
+    const review = await prisma.review.update({ where: { id }, data: { status } });
+
+    revalidateReviews();
+    return {
+      success: true,
+      message: status === ReviewStatus.APPROVED ? "Review approved" : "Review rejected",
+      data: review,
+    };
+  } catch (error) {
+    return toErrorResult(error, "Review update failed");
+  }
+}
+
+export async function getPendingReviewCount(): Promise<ActionResult<number>> {
+  try {
+    await requireAdmin();
+
+    const count = await prisma.review.count({ where: { status: ReviewStatus.PENDING } });
+    return { success: true, data: count };
+  } catch (error) {
+    return toErrorResult(error, "Failed to count pending reviews");
   }
 }

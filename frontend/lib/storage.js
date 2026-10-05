@@ -148,3 +148,4 @@ export async function discardUnsavedImage(url) {
   const { error } = await createClient().storage.from(STORAGE_BUCKET).remove([path]);
   if (error) console.warn("Could not delete unsaved upload:", error.message);
 }
+
