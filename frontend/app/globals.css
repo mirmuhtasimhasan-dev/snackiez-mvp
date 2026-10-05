@@ -17,6 +17,7 @@
   --bz-highlight: #ffb800;
   --bz-highlight-ink: #a3480a;
   --bz-hero: #fdf7ef; /* home hero; matches the hero photo background */
+  --bz-creators: #1a120d; /* dark "Loved by Creators" section */
   /* Dark block: footer. */
   --bz-espresso: #2b1a12;
   --bz-cream: #fff4e6;
@@ -35,6 +36,7 @@
   --color-highlight: var(--bz-highlight);
   --color-highlight-ink: var(--bz-highlight-ink);
   --color-hero: var(--bz-hero);
+  --color-creators: var(--bz-creators);
   --color-espresso: var(--bz-espresso);
   --color-cream: var(--bz-cream);
 
@@ -86,3 +88,56 @@ body {
   }
 }
 
+
+/* Reviews marquee: the track holds its cards twice and slides by half its
+   width, so the loop is seamless. CSS only, no scroll scripting. */
+.marquee {
+  overflow: hidden;
+  /* Soft fade into the section on both edges. */
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-slide 70s linear infinite;
+}
+
+/* Each card carries its own gap so half the track is exactly one set. */
+.marquee-track > li {
+  margin-right: 0.75rem;
+}
+
+.marquee-right {
+  animation-direction: reverse;
+}
+
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-slide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Reduced motion: no animation. Show each review once in a normal swipe row. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    overflow-x: auto;
+    mask-image: none;
+    padding: 0 1rem;
+  }
+
+  .marquee-track {
+    animation: none;
+  }
+
+  .marquee-copy {
+    display: none;
+  }
+}

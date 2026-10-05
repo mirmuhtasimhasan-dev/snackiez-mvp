@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { after } from "next/server";
 import type { Category, MenuItem } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { CACHE_TAGS } from "@/lib/site-data";
 import { deleteImageIfUnused } from "@/lib/storage-server";
 import { ActionError, toErrorResult } from "@/lib/action-result";
 import type { ActionResult } from "@/lib/action-result";
@@ -16,6 +17,8 @@ import type {
 } from "@/types/menu";
 
 function revalidateMenu() {
+  // Expire the cached menu now, so the edit shows on the next page view.
+  updateTag(CACHE_TAGS.menu);
   revalidatePath("/");
   revalidatePath("/menu");
   revalidatePath("/admin");

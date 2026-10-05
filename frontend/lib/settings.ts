@@ -66,7 +66,7 @@ export async function writeSiteSettings(data: Partial<SiteSettingsData>): Promis
 const cachedSettings = unstable_cache(readSiteSettings, [SETTINGS_TAG], {
   tags: [SETTINGS_TAG],
   // Safety net; saves from admin and Telegram expire the tag immediately.
-  revalidate: 60,
+  revalidate: 300,
 });
 
 /** Cached settings for rendering pages. Falls back to defaults on a database error. */

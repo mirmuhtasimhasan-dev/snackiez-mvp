@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { after } from "next/server";
 import { PaymentMethod, Prisma } from "@prisma/client";
 import type { OrderStatus } from "@prisma/client";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/order-status";
 import { notifyNewOrder, syncOrderMessage } from "@/lib/order-telegram";
 import { readSiteSettings } from "@/lib/settings";
+import { CACHE_TAGS } from "@/lib/site-data";
 import { isStoreOpen } from "@/lib/store-hours";
 import type { CreateOrderInput, OrderWithDetails } from "@/types/order";
 
@@ -226,6 +227,9 @@ export async function updateOrderStatus(
       const change = { actor: `Admin panel (${admin.email ?? "admin"})`, at: new Date() };
       after(() => syncOrderMessage(order.id, change));
     }
+
+    // Stock and sold-out status may have changed: expire the cached menu.
+    updateTag(CACHE_TAGS.menu);
 
     revalidatePath("/admin");
     revalidatePath("/menu");

@@ -1,14 +1,16 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import type { CreatorVideo } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { CACHE_TAGS } from "@/lib/site-data";
 import { ActionError, toErrorResult } from "@/lib/action-result";
 import type { ActionResult } from "@/lib/action-result";
 import type { CreatorVideoInput } from "@/types/video";
 
 function revalidateVideos() {
+  updateTag(CACHE_TAGS.videos);
   revalidatePath("/");
   revalidatePath("/admin/videos");
 }

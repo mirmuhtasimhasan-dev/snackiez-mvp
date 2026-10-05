@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getMenu } from "@/lib/site-data";
 import { categoryImage, categoryShortName } from "@/lib/categories";
 import { getSiteSettings } from "@/lib/settings";
 import MenuBrowser from "./MenuBrowser";
@@ -9,28 +9,11 @@ export const metadata = {
 };
 
 export default async function MenuPage({ searchParams }) {
-  // Stock changes with every order, so always render with fresh data.
+  // The menu comes from the data cache, which is expired whenever stock or
+  // the menu changes (order status changes and admin edits).
   await connection();
   const { category: requestedCategory } = await searchParams;
-  const settings = await getSiteSettings();
-
-  const categories = await prisma.category.findMany({
-    orderBy: { createdAt: "asc" },
-    include: {
-      menuItems: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          price: true,
-          image: true,
-          isAvailable: true,
-          stockQty: true,
-        },
-      },
-    },
-  });
+  const [settings, categories] = await Promise.all([getSiteSettings(), getMenu()]);
 
   const withItems = categories
     .filter((category) => category.menuItems.length > 0)

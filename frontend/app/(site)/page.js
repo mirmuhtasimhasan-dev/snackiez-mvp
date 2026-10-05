@@ -3,7 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import heroDesktop from "@/public/hero-light.webp";
 import heroMobile from "@/public/hero-light-mobile.webp";
-import { prisma } from "@/lib/prisma";
+import { getCreatorVideos, getMenu, getPublicReviews } from "@/lib/site-data";
 import { categoryImage, categoryShortName } from "@/lib/categories";
 import { getSiteSettings } from "@/lib/settings";
 import { DELIVERY_ZONES, formatPrice, whatsappLink } from "@/lib/site";
@@ -13,11 +13,14 @@ import CreatorVideos from "@/app/components/CreatorVideos";
 import FallbackImage from "@/app/components/FallbackImage";
 import MenuCard from "@/app/components/MenuCard";
 import Reveal from "@/app/components/Reveal";
+import { ReviewStars, reviewSummary } from "@/app/components/ReviewCard";
+import ReviewsMarquee from "@/app/components/ReviewsMarquee";
 import {
   BagIcon,
   CashIcon,
   CheckIcon,
   ClockIcon,
+  InstagramIcon,
   MoonIcon,
   PinIcon,
   WhatsAppIcon,
@@ -29,16 +32,6 @@ export const metadata = {
 
 const NEW_ITEM_NAME = "BBQ Micro Burger";
 const NEW_ITEM_PRICE = 289;
-
-const menuCardSelect = {
-  id: true,
-  name: true,
-  description: true,
-  price: true,
-  image: true,
-  isAvailable: true,
-  stockQty: true,
-};
 
 // Hours, WhatsApp number and delivery fee come from admin Settings.
 function buildInfo(settings) {
@@ -54,6 +47,19 @@ function buildInfo(settings) {
       href: whatsappLink(settings.whatsappNumber),
     },
   ].filter(Boolean);
+}
+
+// "https://www.instagram.com/bitezzbd?x=1" -> { url without tracking, handle: "bitezzbd" }
+function instagramProfile(url) {
+  if (!url) return null;
+
+  try {
+    const { origin, pathname } = new URL(url);
+    const handle = pathname.split("/").filter(Boolean)[0];
+    return handle ? { url: `${origin}/${handle}`, handle } : null;
+  } catch {
+    return null;
+  }
 }
 
 function feeLabel(fee) {
@@ -115,15 +121,6 @@ function SectionHeading({ eyebrow, title, children }) {
   );
 }
 
-function Stars({ rating }) {
-  return (
-    <p className="text-lg leading-none text-highlight-ink" aria-label={`${rating} out of 5 stars`}>
-      {"★".repeat(rating)}
-      <span className="text-line">{"★".repeat(5 - rating)}</span>
-    </p>
-  );
-}
-
 // Art-directed hero: phones get the tighter crop in the page flow, desktops
 // get the wide shot as a full-bleed background. <picture> means each device
 // downloads only its own image. fetchPriority replaces preload here, since
@@ -162,61 +159,43 @@ function HeroImage() {
   );
 }
 
+// All from the data cache (lib/site-data.ts) and fetched in parallel, so a
+// normal request does not touch the database.
 async function getHomeData() {
-  const featured = await prisma.menuItem.findMany({
-    where: { isFeatured: true },
-    orderBy: { createdAt: "asc" },
-    take: 4,
-    select: menuCardSelect,
-  });
-
-  const [bestSellers, categories, newItem, reviews, creatorVideos] = await Promise.all([
-    featured.length > 0
-      ? featured
-      : prisma.menuItem.findMany({ orderBy: { createdAt: "asc" }, take: 4, select: menuCardSelect }),
-    prisma.category.findMany({
-      where: { menuItems: { some: {} } },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        name: true,
-        shortName: true,
-        image: true,
-        // First item photo, used when the category has no image of its own.
-        menuItems: {
-          where: { image: { not: null } },
-          orderBy: { createdAt: "asc" },
-          take: 1,
-          select: { image: true },
-        },
-      },
-    }),
-    prisma.menuItem.findFirst({
-      where: { name: NEW_ITEM_NAME },
-      select: { ...menuCardSelect, category: { select: { name: true } } },
-    }),
-    prisma.review.findMany({
-      where: { isVisible: true, status: "APPROVED" },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
-    prisma.creatorVideo.findMany({
-      where: { isVisible: true },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      select: { id: true, handle: true, instagramUrl: true, videoUrl: true, posterUrl: true },
-    }),
+  const [menu, reviews, creatorVideos, settings] = await Promise.all([
+    getMenu(),
+    getPublicReviews(),
+    getCreatorVideos(),
+    getSiteSettings(),
   ]);
 
-  return { bestSellers, categories, newItem, reviews, creatorVideos };
+  // Oldest first across the whole menu (ISO date strings sort correctly).
+  const items = menu
+    .flatMap((category) => category.menuItems)
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  const featured = items.filter((item) => item.isFeatured);
+
+  return {
+    // Items marked Best Seller, or the first four when none are marked.
+    bestSellers: (featured.length > 0 ? featured : items).slice(0, 4),
+    categories: menu.filter((category) => category.menuItems.length > 0),
+    newItem: items.find((item) => item.name === NEW_ITEM_NAME) ?? null,
+    reviews,
+    creatorVideos,
+    settings,
+  };
 }
 
 export default async function HomePage() {
-  // Best sellers show live stock, so render per request.
+  // Rendered per request because open/closed depends on the current time;
+  // the data itself comes from the cache.
   await connection();
-  const { bestSellers, categories, newItem, reviews, creatorVideos } = await getHomeData();
-  const settings = await getSiteSettings();
+  const { bestSellers, categories, newItem, reviews, creatorVideos, settings } = await getHomeData();
   const info = buildInfo(settings);
   const faqs = buildFaqs(settings);
   const whatsappHref = whatsappLink(settings.whatsappNumber);
+  const instagram = instagramProfile(settings.instagramUrl);
+  const summary = reviewSummary(reviews);
 
   return (
     <main>
@@ -513,51 +492,74 @@ export default async function HomePage() {
 
       {/* Loved by Creators: hidden entirely when no video is visible */}
       {creatorVideos.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 pb-8 sm:pb-16">
-          <Reveal>
-            <SectionHeading eyebrow="As seen on Instagram" title="Loved by Creators" />
-          </Reveal>
-          <CreatorVideos videos={creatorVideos} />
+        <section className="relative overflow-hidden bg-creators py-10 text-cream sm:py-16">
+          {/* Soft orange glow behind the carousel */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[min(90vw,720px)] -translate-x-1/2 -translate-y-1/3 rounded-full bg-brand/25 blur-[120px]"
+          />
+
+          <div className="relative mx-auto max-w-6xl px-4">
+            <Reveal className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-highlight sm:text-sm">
+                  As seen on Instagram
+                </p>
+                <h2 className="mt-1 font-display text-4xl leading-none tracking-wide sm:text-6xl">
+                  Loved by Creators
+                </h2>
+                <p className="mt-2 text-sm text-cream/75 sm:mt-3 sm:text-base">
+                  Real reviews from Bashundhara&apos;s food creators
+                </p>
+              </div>
+
+              {instagram && (
+                <a
+                  href={instagram.url}
+                  target="_blank"
+                  rel="noopener"
+                  className="inline-flex h-11 shrink-0 items-center gap-2 self-start whitespace-nowrap rounded-full border border-cream/25 bg-cream/10 px-5 text-sm font-semibold text-cream transition hover:border-brand hover:bg-brand hover:text-fg sm:self-auto"
+                >
+                  <InstagramIcon width={18} height={18} />
+                  Follow @{instagram.handle}
+                </a>
+              )}
+            </Reveal>
+          </div>
+
+          <div className="relative">
+            <CreatorVideos videos={creatorVideos} />
+          </div>
         </section>
       )}
 
-      {/* 9. Reviews: hidden entirely when there are none */}
+      {/* 9. Reviews: an endless two-row marquee. Hidden when there are none. */}
       {reviews.length > 0 && (
-        <section className="border-y border-line bg-alt">
-          <div className="mx-auto max-w-6xl px-4 py-8 sm:py-16">
+        <section className="border-y border-line bg-alt py-8 sm:py-16">
+          <div className="mx-auto max-w-6xl px-4">
             <Reveal>
               <SectionHeading eyebrow="Straight from Bashundhara" title="What People Say" />
+              <p className="mt-3 flex flex-wrap items-center gap-2 text-muted">
+                <ReviewStars rating={Math.round(Number(summary.average))} className="text-xl" />
+                <span>
+                  <span className="font-semibold text-fg">{summary.average}</span> from {summary.count}{" "}
+                  {summary.count === 1 ? "review" : "reviews"}
+                </span>
+              </p>
             </Reveal>
-            <ul className="mt-5 grid grid-cols-1 gap-3 sm:mt-8 sm:gap-4 md:grid-cols-3">
-              {reviews.map((review, index) => (
-                <Reveal as="li" key={review.id} delay={index * 80} className="flex flex-col rounded-2xl border border-line bg-card p-4 shadow-soft sm:p-6">
-                  <Stars rating={review.rating} />
-                  <blockquote className="mt-3 flex-1 text-sm text-fg/90 sm:mt-4 sm:text-base">“{review.text}”</blockquote>
-                  <div className="mt-3 flex items-center gap-3 sm:mt-5">
-                    {review.image && (
-                      // Uploaded to Supabase Storage; any host, so a plain img.
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={review.image}
-                        alt=""
-                        className="h-10 w-10 rounded-full object-cover"
-                        loading="lazy"
-                      />
-                    )}
-                    <div>
-                      <p className="font-semibold">{review.name}</p>
-                      {review.isVerified ? (
-                        <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
-                          <CheckIcon width={12} height={12} strokeWidth={3} /> Verified order
-                        </p>
-                      ) : (
-                        review.source && <p className="text-xs text-muted">via {review.source}</p>
-                      )}
-                    </div>
-                  </div>
-                </Reveal>
-              ))}
-            </ul>
+          </div>
+
+          <div className="mt-6 sm:mt-8">
+            <ReviewsMarquee reviews={reviews} />
+          </div>
+
+          <div className="mt-6 text-center sm:mt-8">
+            <Link
+              href="/reviews"
+              className="inline-flex h-12 items-center rounded-full border border-fg/15 bg-card px-8 font-semibold text-fg shadow-soft transition hover:border-brand"
+            >
+              See all reviews
+            </Link>
           </div>
         </section>
       )}

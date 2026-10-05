@@ -15,17 +15,13 @@ const iconProps = {
   "aria-hidden": true,
 };
 
-function SoundIcon({ on }) {
+function SoundIcon({ on, size = 18 }) {
   return (
-    <svg {...iconProps}>
+    <svg {...iconProps} width={size} height={size}>
       <path d="M4 9v6h4l5 4V5L8 9H4Z" fill="currentColor" />
       {on ? <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /> : <path d="m17 9 5 5m0-5-5 5" />}
     </svg>
   );
-}
-
-function prefersReducedMotion() {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 function InstagramMark() {
@@ -66,107 +62,293 @@ function Credit({ video, className = "" }) {
   );
 }
 
+function ArrowIcon({ direction }) {
+  return (
+    <svg {...iconProps} width={20} height={20}>
+      <path d={direction === "left" ? "m15 5-7 7 7 7" : "m9 5 7 7-7 7"} />
+    </svg>
+  );
+}
+
+function videoLabel(video) {
+  return video.handle ? `the video from @${video.handle}` : "this video";
+}
+
+// Shortest way round the loop from the active card: -2, -1, 0, 1, 2 ...
+function offsetOf(index, active, count) {
+  const half = Math.floor(count / 2);
+  return ((((index - active + half) % count) + count) % count) - half;
+}
+
+// Centre-focus carousel. The middle card is full size and is the only one
+// with a <video>; the others show their poster, smaller and dimmed. It loops
+// forever and moves on when the active video ends.
 export default function CreatorVideos({ videos }) {
-  const rowRefs = useRef([]);
-  const [activeIndex, setActiveIndex] = useState(-1); // the one card playing in the row
-  const [soundIndex, setSoundIndex] = useState(-1); // the card unmuted in the row
+  const count = videos.length;
+  const rootRef = useRef(null);
+  const videoRef = useRef(null);
+  const progressRef = useRef(null);
+  const heldRef = useRef(false); // hovering or touching: do not auto advance
+  const touchStartX = useRef(null);
+
+  // `jumped` lists cards that wrapped from one end to the other on the last
+  // move; they skip the slide animation so they do not fly across the row.
+  const [state, setState] = useState({ active: 0, jumped: [] });
+  const [inView, setInView] = useState(false);
+  const [soundOn, setSoundOn] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(null);
+  const { active, jumped } = state;
 
-  // Row: play the most visible card once it is at least 60% on screen, and
-  // only that one. Nothing autoplays for visitors who prefer reduced motion.
-  useEffect(() => {
-    if (prefersReducedMotion() || !("IntersectionObserver" in window)) return;
+  const goTo = (target) => {
+    setState((current) => {
+      const next = ((target % count) + count) % count;
+      if (next === current.active) return current;
 
-    const ratios = new Map();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          ratios.set(Number(entry.target.dataset.index), entry.intersectionRatio);
-        }
-
-        let best = -1;
-        let bestRatio = 0.6;
-        for (const [index, ratio] of ratios) {
-          if (ratio >= bestRatio) {
-            best = index;
-            bestRatio = ratio;
-          }
-        }
-        setActiveIndex(best);
-      },
-      { threshold: [0, 0.3, 0.6, 0.9] }
-    );
-
-    rowRefs.current.forEach((video) => video && observer.observe(video));
-    return () => observer.disconnect();
-  }, [videos.length]);
-
-  // Apply play/pause/mute to the row. Everything pauses while the viewer is open.
-  useEffect(() => {
-    rowRefs.current.forEach((video, index) => {
-      if (!video) return;
-
-      const shouldPlay = viewerIndex === null && index === activeIndex;
-      video.muted = !(shouldPlay && index === soundIndex);
-
-      if (shouldPlay) {
-        video.play().catch(() => {});
-      } else {
-        video.pause();
-      }
+      const wrapped = videos
+        .filter(
+          (_, index) =>
+            Math.abs(offsetOf(index, next, count) - offsetOf(index, current.active, count)) > 1
+        )
+        .map((video) => video.id);
+      return { active: next, jumped: wrapped };
     });
-  }, [activeIndex, soundIndex, viewerIndex]);
+  };
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(media.matches);
+    update();
+    media.addEventListener("change", update);
+
+    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
+      threshold: 0.4,
+    });
+    if (rootRef.current) observer.observe(rootRef.current);
+
+    return () => {
+      media.removeEventListener("change", update);
+      observer.disconnect();
+    };
+  }, []);
+
+  // Play the active video only while the carousel is on screen, the full
+  // screen viewer is closed, and motion is allowed.
+  const shouldPlay = inView && viewerIndex === null && !reducedMotion;
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.muted = !soundOn;
+    if (shouldPlay) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+    }
+  }, [shouldPlay, soundOn, active]);
+
+  // Progress bar: back to 0 whenever a new video becomes active.
+  useEffect(() => {
+    if (progressRef.current) progressRef.current.style.width = "0%";
+  }, [active]);
+
+  // While playing, follow the video's real position every frame.
+  useEffect(() => {
+    if (!shouldPlay) return;
+
+    let frame;
+    const tick = () => {
+      const video = videoRef.current;
+      if (video && progressRef.current && video.duration > 0 && !video.ended) {
+        progressRef.current.style.width = `${Math.min(100, (video.currentTime / video.duration) * 100)}%`;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(frame);
+  }, [shouldPlay, active]);
+
+  const handleEnded = () => {
+    const video = videoRef.current;
+    if (progressRef.current) progressRef.current.style.width = "100%";
+    // Held (hover or touch) or a single video: replay in place.
+    if (heldRef.current || count < 2) {
+      if (video) {
+        video.currentTime = 0;
+        video.play().catch(() => {});
+      }
+      return;
+    }
+    goTo(active + 1);
+  };
+
+  const handleTouchEnd = (event) => {
+    heldRef.current = false;
+    if (touchStartX.current === null) return;
+
+    const delta = event.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) > 40) goTo(active + (delta < 0 ? 1 : -1));
+  };
 
   return (
-    <>
-      <ul className="-mx-4 mt-5 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mt-8 sm:gap-4 lg:mx-0 lg:px-0 [&::-webkit-scrollbar]:hidden">
-        {videos.map((video, index) => (
-          <li key={video.id} className="w-[72%] shrink-0 snap-start sm:w-[38%] lg:w-[calc(25%-0.75rem)]">
-            <div className="relative aspect-[9/16] overflow-hidden rounded-2xl bg-espresso shadow-soft">
-              <video
-                ref={(node) => {
-                  rowRefs.current[index] = node;
-                }}
-                data-index={index}
-                src={video.videoUrl}
-                poster={video.posterUrl ?? undefined}
-                preload="none"
-                muted
-                loop
-                playsInline
-                className="h-full w-full object-cover"
-              />
+    <div ref={rootRef} className="mt-8">
+      <div
+        role="group"
+        aria-roledescription="carousel"
+        aria-label="Creator videos"
+        className="relative [--w:min(62vw,250px)] sm:[--w:250px] lg:[--w:270px]"
+        onMouseEnter={() => {
+          heldRef.current = true;
+        }}
+        onMouseLeave={() => {
+          heldRef.current = false;
+        }}
+        onTouchStart={(event) => {
+          heldRef.current = true;
+          touchStartX.current = event.touches[0].clientX;
+        }}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={() => {
+          heldRef.current = false;
+          touchStartX.current = null;
+        }}
+      >
+        <div className="relative h-[calc(var(--w)*16/9)] overflow-hidden">
+          {videos.map((video, index) => {
+            const offset = offsetOf(index, active, count);
+            const distance = Math.abs(offset);
+            const isActive = offset === 0;
+            // Up to two cards each side on wide screens; further ones wait hidden.
+            const hidden = distance > 2 || (distance === 2 && count < 5);
 
-              <button
-                type="button"
-                onClick={() => setViewerIndex(index)}
-                className="absolute inset-0"
-                aria-label={`Watch ${video.handle ? `@${video.handle}'s video` : "this video"} full screen with sound`}
-              />
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveIndex(index);
-                  setSoundIndex((current) => (current === index ? -1 : index));
+            return (
+              <div
+                key={video.id}
+                aria-hidden={!isActive}
+                className={`absolute left-1/2 top-0 -ml-[calc(var(--w)/2)] w-[var(--w)] duration-500 ease-out ${
+                  jumped.includes(video.id) ? "transition-none" : "transition-[transform,opacity,filter]"
+                } ${hidden ? "pointer-events-none opacity-0" : "opacity-100"} ${
+                  isActive ? "z-20" : distance === 1 ? "z-10 brightness-50" : "z-0 brightness-[0.35]"
+                }`}
+                style={{
+                  transform: `translateX(calc(${offset} * var(--w) * 0.9)) scale(${
+                    isActive ? 1 : distance === 1 ? 0.85 : 0.72
+                  })`,
                 }}
-                className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm"
-                aria-label={soundIndex === index ? "Mute" : "Play with sound"}
-                aria-pressed={soundIndex === index}
               >
-                <SoundIcon on={soundIndex === index} />
-              </button>
-            </div>
+                <div className="relative aspect-[9/16] overflow-hidden rounded-3xl bg-black shadow-2xl shadow-black/60 ring-1 ring-white/10">
+                  {video.posterUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element -- local poster from public/videos
+                    <img
+                      src={video.posterUrl}
+                      alt=""
+                      loading="lazy"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  )}
 
-            <Credit video={video} className="mt-2 inline-flex text-fg" />
-          </li>
-        ))}
-      </ul>
+                  {isActive ? (
+                    <>
+                      {/* The only <video> in the row: nothing else loads. */}
+                      <video
+                        ref={videoRef}
+                        key={video.id}
+                        src={video.videoUrl}
+                        poster={video.posterUrl ?? undefined}
+                        preload={shouldPlay ? "auto" : "none"}
+                        muted
+                        playsInline
+                        onEnded={handleEnded}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setViewerIndex(index)}
+                        className="absolute inset-0"
+                        aria-label={`Watch ${videoLabel(video)} full screen with sound`}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setSoundOn((value) => !value)}
+                        className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
+                        aria-label={soundOn ? "Mute" : "Turn sound on"}
+                        aria-pressed={soundOn}
+                      >
+                        <SoundIcon on={soundOn} size={16} />
+                      </button>
+
+                      {/* Bottom 35%: dark gradient so the bar and @handle stay
+                          readable over text baked into the video. */}
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-[35%] flex-col justify-end bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 text-white">
+                        {/* Progress bar: width follows the video (see the effect above). */}
+                        <div className="h-[3px] w-full overflow-hidden rounded-full bg-white/25">
+                          <div ref={progressRef} className="h-full w-0 rounded-full bg-white/90" />
+                        </div>
+                        <div className="mt-2.5">
+                          <Credit video={video} className="pointer-events-auto inline-flex" />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => goTo(index)}
+                      className="absolute inset-0"
+                      aria-label={`Show ${videoLabel(video)}`}
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {count > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => goTo(active - 1)}
+              className="absolute left-2 top-1/2 z-30 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-brand hover:text-fg md:flex lg:left-6"
+              aria-label="Previous video"
+            >
+              <ArrowIcon direction="left" />
+            </button>
+            <button
+              type="button"
+              onClick={() => goTo(active + 1)}
+              className="absolute right-2 top-1/2 z-30 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-brand hover:text-fg md:flex lg:right-6"
+              aria-label="Next video"
+            >
+              <ArrowIcon direction="right" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {count > 1 && (
+        <div className="mt-5 flex justify-center gap-2 md:hidden">
+          {videos.map((video, index) => (
+            <button
+              key={video.id}
+              type="button"
+              onClick={() => goTo(index)}
+              aria-label={`Video ${index + 1} of ${count}`}
+              aria-current={index === active ? "true" : undefined}
+              className={`h-2 rounded-full transition-all ${index === active ? "w-6 bg-brand" : "w-2 bg-white/30"}`}
+            />
+          ))}
+        </div>
+      )}
 
       {viewerIndex !== null && (
         <Viewer videos={videos} startIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
       )}
-    </>
+    </div>
   );
 }
 

@@ -12,7 +12,7 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-card/95 backdrop-blur-md">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2" aria-label="Bitezz home">
+        <Link href="/" prefetch className="flex items-center gap-2" aria-label="Bitezz home">
           <Image src={logo} alt="" width={40} height={40} loading="eager" className="h-10 w-10" />
           <span className="font-display text-2xl tracking-wide">Bitezz</span>
         </Link>
@@ -20,6 +20,7 @@ export default function Navbar() {
         <div className="flex items-center gap-1">
           <Link
             href="/menu"
+            prefetch
             className="rounded-full px-4 py-2.5 text-sm font-semibold text-fg/80 hover:bg-alt hover:text-fg"
           >
             Menu

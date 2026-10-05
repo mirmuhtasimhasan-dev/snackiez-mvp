@@ -4,6 +4,7 @@ import { ActionError } from "@/lib/action-result";
 import { changeOrderStatus } from "@/lib/order-status";
 import { decodeStatusAction, statusLabel, syncOrderMessage } from "@/lib/order-telegram";
 import { SETTINGS_TAG } from "@/lib/settings";
+import { CACHE_TAGS } from "@/lib/site-data";
 import { parseStoreCommand, runStoreCommand } from "@/lib/store-telegram";
 import { answerCallbackQuery, sendMessage } from "@/lib/telegram";
 
@@ -93,6 +94,8 @@ export async function POST(request: Request) {
     await syncOrderMessage(order.id, { actor: displayName(query.from), at: new Date() });
     await answerCallbackQuery(query.id, `${order.orderCode}: ${statusLabel(order.status)}`);
 
+    // Stock may have changed. A webhook cannot use updateTag, so expire now.
+    revalidateTag(CACHE_TAGS.menu, { expire: 0 });
     revalidatePath("/admin");
     revalidatePath("/menu");
     revalidatePath("/");

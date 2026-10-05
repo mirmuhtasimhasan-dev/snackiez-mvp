@@ -1,11 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { after } from "next/server";
 import { ReviewStatus } from "@prisma/client";
 import type { Review } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { CACHE_TAGS } from "@/lib/site-data";
 import { deleteImageIfUnused } from "@/lib/storage-server";
 import { ActionError, toErrorResult } from "@/lib/action-result";
 import type { ActionResult } from "@/lib/action-result";
@@ -13,6 +14,7 @@ import type { ReviewInput } from "@/types/review";
 import { REVIEW_SOURCES } from "@/lib/reviews";
 
 function revalidateReviews() {
+  updateTag(CACHE_TAGS.reviews);
   revalidatePath("/");
   revalidatePath("/admin/reviews");
   // The sidebar badge with the pending count sits in the admin layout.
