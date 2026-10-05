@@ -28,26 +28,41 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function Credit({ video, className = "" }) {
-  const handle = video.handle ? `@${video.handle}` : null;
-
+function InstagramMark() {
   return (
-    <p className={`min-w-0 text-sm ${className}`}>
-      <span className="block truncate font-semibold">{video.creatorName}</span>
-      {handle &&
-        (video.instagramUrl ? (
-          <a
-            href={video.instagramUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block truncate opacity-80 hover:underline"
-          >
-            {handle}
-          </a>
-        ) : (
-          <span className="block truncate opacity-80">{handle}</span>
-        ))}
-    </p>
+    <svg {...iconProps} width={16} height={16} className="shrink-0">
+      <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.2" cy="6.8" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+// Only the Instagram @handle is shown. It links to the collab reel, which
+// opens in the Instagram app on phones.
+function Credit({ video, className = "" }) {
+  if (!video.handle) return null;
+
+  const content = (
+    <>
+      <InstagramMark />
+      <span className="truncate">@{video.handle}</span>
+    </>
+  );
+  const classes = `flex min-w-0 max-w-full items-center gap-1.5 text-sm font-semibold ${className}`;
+
+  return video.instagramUrl ? (
+    <a
+      href={video.instagramUrl}
+      target="_blank"
+      rel="noopener"
+      aria-label={`@${video.handle} on Instagram`}
+      className={`${classes} hover:underline`}
+    >
+      {content}
+    </a>
+  ) : (
+    <p className={classes}>{content}</p>
   );
 }
 
@@ -126,7 +141,7 @@ export default function CreatorVideos({ videos }) {
                 type="button"
                 onClick={() => setViewerIndex(index)}
                 className="absolute inset-0"
-                aria-label={`Watch ${video.creatorName}'s video full screen with sound`}
+                aria-label={`Watch ${video.handle ? `@${video.handle}'s video` : "this video"} full screen with sound`}
               />
 
               <button
@@ -143,7 +158,7 @@ export default function CreatorVideos({ videos }) {
               </button>
             </div>
 
-            <Credit video={video} className="mt-2 text-fg" />
+            <Credit video={video} className="mt-2 inline-flex text-fg" />
           </li>
         ))}
       </ul>
@@ -233,7 +248,9 @@ function Viewer({ videos, startIndex, onClose }) {
               className="h-full max-h-full w-full max-w-[min(100%,calc(100dvh*9/16))] object-contain"
             />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-16">
-              <Credit video={video} className="pointer-events-auto mx-auto max-w-md" />
+              <div className="mx-auto max-w-md">
+                <Credit video={video} className="pointer-events-auto inline-flex" />
+              </div>
             </div>
           </div>
         ))}

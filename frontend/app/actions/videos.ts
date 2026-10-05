@@ -48,8 +48,8 @@ function parseVideo(input: Partial<CreatorVideoInput>, partial: boolean) {
   const data: Partial<Omit<CreatorVideo, "id" | "createdAt">> = {};
 
   if (!partial || input.creatorName !== undefined) {
-    if (!input.creatorName?.trim()) throw new ActionError("Creator name is required");
-    data.creatorName = input.creatorName.trim();
+    // Optional internal note for admin. Never shown on the site.
+    data.creatorName = input.creatorName?.trim() ?? "";
   }
 
   if (input.handle !== undefined) {
@@ -58,7 +58,9 @@ function parseVideo(input: Partial<CreatorVideoInput>, partial: boolean) {
   }
 
   if (input.instagramUrl !== undefined) {
-    data.instagramUrl = parseHttpsUrl(input.instagramUrl, "Instagram link", false);
+    const url = parseHttpsUrl(input.instagramUrl, "Instagram link", false);
+    // Drop tracking parameters such as ?igsh=... and any #fragment.
+    data.instagramUrl = url ? url.split(/[?#]/)[0] : null;
   }
 
   if (!partial || input.videoUrl !== undefined) {

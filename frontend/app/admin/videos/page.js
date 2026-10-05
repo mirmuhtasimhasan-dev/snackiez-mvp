@@ -93,10 +93,6 @@ export default function AdminVideosPage() {
     const videoUrl = form.videoUrl.trim();
     const posterUrl = form.posterUrl.trim();
 
-    if (!form.creatorName.trim()) {
-      setError("Creator name is required.");
-      return;
-    }
     if (!videoUrl.startsWith(VIDEO_PREFIX) || videoUrl.length <= VIDEO_PREFIX.length) {
       setError("Video path must start with /videos/, e.g. /videos/salsasblog_.mp4");
       return;
@@ -160,7 +156,7 @@ export default function AdminVideosPage() {
   };
 
   const handleDelete = async (video) => {
-    if (!confirm(`Delete the video from ${video.creatorName}? The files in public/videos are not touched.`)) return;
+    if (!confirm(`Delete the video ${video.handle ? `from @${video.handle}` : video.creatorName || video.videoUrl}? The files in public/videos are not touched.`)) return;
 
     setBusyId(video.id);
     try {
@@ -209,12 +205,12 @@ export default function AdminVideosPage() {
           </div>
 
           <div>
-            <label htmlFor="creatorName" className="mb-2 block font-semibold text-gray-700">Creator name</label>
+            <label htmlFor="creatorName" className="mb-2 block font-semibold text-gray-700">Creator name (optional, admin only)</label>
             <input id="creatorName" name="creatorName" value={form.creatorName} onChange={handleChange} className={inputClass} placeholder="Foodie Dhaka" />
           </div>
 
           <div>
-            <label htmlFor="handle" className="mb-2 block font-semibold text-gray-700">Handle</label>
+            <label htmlFor="handle" className="mb-2 block font-semibold text-gray-700">Instagram handle (shown on the site)</label>
             <input id="handle" name="handle" value={form.handle} onChange={handleChange} className={inputClass} placeholder="@foodiedhaka" />
           </div>
 
@@ -275,9 +271,9 @@ export default function AdminVideosPage() {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold">{video.creatorName}</p>
+                    <p className="font-bold">{video.handle ? `@${video.handle}` : "No handle (nothing shows under the card)"}</p>
                     <p className="truncate text-sm text-gray-600">
-                      {video.handle ? `@${video.handle}` : "No handle"}
+                      {video.creatorName || "No name"}
                       {video.instagramUrl && (
                         <>
                           {" · "}

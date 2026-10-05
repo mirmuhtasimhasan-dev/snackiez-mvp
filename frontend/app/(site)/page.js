@@ -202,7 +202,7 @@ async function getHomeData() {
     prisma.creatorVideo.findMany({
       where: { isVisible: true },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      select: { id: true, creatorName: true, handle: true, instagramUrl: true, videoUrl: true, posterUrl: true },
+      select: { id: true, handle: true, instagramUrl: true, videoUrl: true, posterUrl: true },
     }),
   ]);
 
