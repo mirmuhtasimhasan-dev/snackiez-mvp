@@ -211,7 +211,7 @@ export default function CheckoutForm({ bkashNumber }) {
             Delivery address
           </legend>
           <p className="-mt-2 text-sm text-muted">
-            Bashundhara R/A only, including NSU, IUB and NISS.
+            Bashundhara R/A only, including NSU and IUB.
           </p>
 
           <div className="grid grid-cols-3 gap-3">

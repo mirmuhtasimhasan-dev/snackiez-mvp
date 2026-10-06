@@ -1,7 +1,7 @@
 // Contact details, hours and the delivery fee come from SiteSettings (admin
 // Settings page). Only things that never change live here.
 export const AREA = "Bashundhara R/A, Dhaka";
-export const DELIVERY_ZONES = ["Bashundhara R/A", "NSU", "IUB", "NISS"];
+export const DELIVERY_ZONES = ["Bashundhara R/A", "NSU", "IUB"];
 
 /** wa.me link for a local BD number like 01816453795, or null without one. */
 export function whatsappLink(number, message) {

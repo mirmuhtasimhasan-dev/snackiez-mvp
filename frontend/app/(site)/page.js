@@ -104,7 +104,7 @@ function buildFaqs(settings) {
     },
     {
       q: "Which areas do you deliver to?",
-      a: "Bashundhara R/A only, including NSU, IUB and NISS. Enter your block, road and house at checkout.",
+      a: "Bashundhara R/A only, including NSU and IUB. Enter your block, road and house at checkout.",
     },
   ];
 }
@@ -462,7 +462,7 @@ export default async function HomePage() {
               We deliver only inside Bashundhara R/A so every order arrives hot.
             </SectionHeading>
             <ul className="mt-3 flex flex-wrap gap-1.5 sm:mt-6 sm:gap-2">
-              {DELIVERY_ZONES.filter((zone) => zone !== "NISS").map((zone) => (
+              {DELIVERY_ZONES.map((zone) => (
                 <li
                   key={zone}
                   className="flex items-center gap-1 whitespace-nowrap rounded-full border border-line bg-alt px-2.5 py-1 text-xs font-semibold sm:gap-1.5 sm:px-4 sm:py-2 sm:text-sm"
